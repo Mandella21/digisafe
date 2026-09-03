@@ -142,6 +142,30 @@ missing, `/api/reports/download/{id}` simply regenerates it from the record.
 Locally, nothing changes. With no `DATABASE_URL` set you get `digisafe.db` as
 before.
 
+### The one catch: Render's free database expires after 30 days
+
+Render allows one free Postgres instance per workspace, capped at 1 GB, and
+**it expires 30 days after creation** (with a 14-day grace period to upgrade
+before deletion). For a project defended within a few weeks that is fine. If
+this needs to stay up longer, do not pay Render — point it at a free Postgres
+elsewhere that does not expire:
+
+* **Neon** — <https://neon.tech>
+* **Supabase** — <https://supabase.com>
+
+Both give a free instance with no card. Create one, copy its connection string,
+and set it as `DATABASE_URL` in the Render dashboard; it overrides the value
+the blueprint wires in. Nothing in the code changes — `core/database.py` reads
+whatever URL it is given, and normalises the `postgres://` prefix these
+providers hand out.
+
+### And a second one: the free web service sleeps
+
+Render spins a free web service down after 15 minutes with no traffic, and the
+next request wakes it in roughly a minute. The URL never changes and nothing is
+lost — the first visitor after a quiet spell simply waits. Open the site
+yourself a few minutes before a demonstration so the panel never sees that.
+
 ---
 
 ## 2. Deploy Free to Render.com (Recommended - 5 Minutes)
