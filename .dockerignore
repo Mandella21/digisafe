@@ -1,0 +1,14 @@
+﻿__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+.env
+.venv
+storage/evidence_files/*
+!storage/evidence_files/.gitkeep
+storage/reports/*
+!storage/reports/.gitkeep
+*.docx
+extracted_doc_summary.txt
+chapters_3_and_4.txt

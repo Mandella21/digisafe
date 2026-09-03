@@ -1,0 +1,126 @@
+﻿:root {
+    --navy-dark: #090e17;
+    --navy-header: #0f172a;
+    --navy-card: #1e293b;
+    --primary-blue: #2563eb;
+    --accent-teal: #06b6d4;
+    --border-light: #e2e8f0;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #1e293b;
+    background-color: #f8fafc;
+}
+
+.font-monospace {
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+.bg-navy {
+    background-color: var(--navy-header) !important;
+}
+
+.bg-navy-card {
+    background-color: var(--navy-card) !important;
+}
+
+.brand-icon {
+    font-size: 1.4rem;
+    color: var(--accent-teal);
+}
+
+.hero-section {
+    background: radial-gradient(circle at top left, #1e293b 0%, #0f172a 100%);
+    border-bottom: 1px solid #334155;
+}
+
+.feature-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+}
+
+.feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px -3px rgba(0, 0, 0, 0.08) !important;
+}
+
+.feature-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+}
+
+.bg-indigo-subtle {
+    background-color: #eef2ff !important;
+}
+
+.text-indigo {
+    color: #4338ca !important;
+}
+
+/* Threat Badge Badges */
+.threat-badge-critical {
+    background-color: #dc2626 !important;
+    color: #ffffff !important;
+    font-weight: 700;
+}
+
+.threat-badge-high {
+    background-color: #ea580c !important;
+    color: #ffffff !important;
+    font-weight: 700;
+}
+
+.threat-badge-medium {
+    background-color: #f59e0b !important;
+    color: #1f2937 !important;
+    font-weight: 600;
+}
+
+.threat-badge-low {
+    background-color: #dbeafe !important;
+    color: #1e40af !important;
+    font-weight: 600;
+}
+
+.threat-badge-none {
+    background-color: #dcfce7 !important;
+    color: #166534 !important;
+    font-weight: 600;
+}
+
+/* Status Badges */
+.status-badge-verified {
+    background-color: #dcfce7 !important;
+    color: #15803d !important;
+    border: 1px solid #bbf7d0;
+}
+
+.status-badge-flagged {
+    background-color: #ffedd5 !important;
+    color: #c2410c !important;
+    border: 1px solid #fed7aa;
+}
+
+.status-badge-compromised {
+    background-color: #fee2e2 !important;
+    color: #b91c1c !important;
+    border: 1px solid #fca5a5;
+    animation: pulse 2s infinite;
+}
+
+.status-badge-pending {
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+    border: 1px solid #e2e8f0;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}

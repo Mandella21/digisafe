@@ -1,0 +1,109 @@
+﻿{% extends "base.html" %}
+
+{% block title %}My Evidence Tracking Dashboard - DigiSafe{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="bi bi-folder2-open text-primary me-2"></i> Evidence Tracking Dashboard</h3>
+            <p class="text-muted small mb-0">Review preserved digital records, verify cryptographic fingerprints, and export legal dossiers.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="loadMyEvidence()">
+                <i class="bi bi-arrow-clockwise me-1"></i> Refresh Records
+            </button>
+            <a href="/submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-circle me-1"></i> Capture New Evidence
+            </a>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="noEvidenceAlert" class="card border-0 shadow-sm rounded-4 p-5 text-center d-none">
+        <div class="feature-icon bg-light text-muted mx-auto mb-3" style="width: 64px; height: 64px; font-size: 2rem;">
+            <i class="bi bi-inbox"></i>
+        </div>
+        <h5 class="fw-bold text-dark">No Evidence Records Captured Yet</h5>
+        <p class="text-muted small mb-3">You have not submitted any digital evidence records under this account.</p>
+        <a href="/submit" class="btn btn-primary btn-sm px-4 mx-auto">
+            <i class="bi bi-plus-circle me-1"></i> Submit First Record
+        </a>
+    </div>
+
+    <!-- Evidence Records Container -->
+    <div id="evidenceListContainer" class="row g-3">
+        <!-- Injected via JavaScript -->
+        <div class="col-12 text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="small text-muted mt-2">Loading cryptographically verified records...</p>
+        </div>
+    </div>
+</div>
+
+<!-- VIEW EVIDENCE DETAILS MODAL -->
+<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
+            <div class="modal-header bg-navy text-white py-3">
+                <h5 class="modal-title fw-bold" id="detailModalTitle"><i class="bi bi-file-text me-2"></i> Evidence Record</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <div class="small text-uppercase fw-bold text-muted mb-1">SHA-256 Digital Fingerprint</div>
+                    <div class="font-monospace text-primary bg-light p-2 rounded border small text-break" id="detailModalHash">...</div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="small text-uppercase fw-bold text-muted mb-1">Decrypted Raw Content</div>
+                    <div class="p-3 bg-light rounded border text-dark font-monospace" style="white-space: pre-wrap;" id="detailModalContent">...</div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="card p-2 bg-light border-0 small">
+                            <span class="text-muted">Source Platform / URL:</span>
+                            <strong id="detailModalSource" class="text-break">None</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card p-2 bg-light border-0 small">
+                            <span class="text-muted">Attachment:</span>
+                            <strong id="detailModalFile">No attachment</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card bg-indigo-subtle border-0 p-3 rounded-3 mb-3">
+                    <h6 class="fw-bold text-indigo mb-1"><i class="bi bi-cpu me-1"></i> Machine Learning Content Analysis</h6>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge" id="detailModalMlLabel">Abusive</span>
+                        <span class="badge" id="detailModalThreat">High</span>
+                        <small class="text-muted" id="detailModalScore">Confidence: 90%</small>
+                    </div>
+                    <div class="small text-dark" id="detailModalSummary">Summary details...</div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success btn-sm" id="detailVerifyBtn">
+                    <i class="bi bi-shield-check me-1"></i> Verify Checksum Now
+                </button>
+                <a href="#" class="btn btn-primary btn-sm" id="detailDownloadBtn" target="_blank">
+                    <i class="bi bi-file-earmark-pdf-fill me-1"></i> Download Legal Dossier
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    checkAuthUI();
+    loadMyEvidence();
+});
+</script>
+{% endblock %}

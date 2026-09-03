@@ -1,0 +1,168 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Submit Evidence - DigiSafe{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <h3 class="fw-bold mb-1"><i class="bi bi-shield-plus text-primary me-2"></i> Capture Digital Evidence</h3>
+                    <p class="text-muted small mb-0">Submissions are cryptographically hashed and encrypted at rest for legal admissibility.</p>
+                </div>
+                <a href="/track" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-clock-history me-1"></i> View Submitted Cases
+                </a>
+            </div>
+
+            <!-- Evidence Submission Form (Listing 4.1) -->
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+                <div class="card-body p-4">
+                    <form id="evidenceForm" enctype="multipart/form-data">
+                        
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Evidence Type <span class="text-danger">*</span></label>
+                                <select id="contentType" class="form-select" required>
+                                    <option value="text" selected>Text Message / Chat Log</option>
+                                    <option value="url">Web URL / Social Media Post</option>
+                                    <option value="file">Image / Screenshot / Document</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Platform of Origin</label>
+                                <select id="platformSelect" class="form-select">
+                                    <option value="WhatsApp">WhatsApp Messenger</option>
+                                    <option value="Instagram">Instagram</option>
+                                    <option value="X / Twitter">X / Twitter</option>
+                                    <option value="Facebook">Facebook</option>
+                                    <option value="TikTok">TikTok</option>
+                                    <option value="Telegram">Telegram</option>
+                                    <option value="SMS">SMS / Phone Message</option>
+                                    <option value="Other">Other Digital Service</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Source URL or Sender Handle / Phone Number</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                                <input type="text" id="sourceUrl" class="form-control" placeholder="e.g. https://instagram.com/p/... or @username or +233 24 000 0000">
+                            </div>
+                            <small class="text-muted">Helps establish the origin and digital footprint of the perpetrator.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label fw-semibold mb-0">Evidence Content / Message Text <span class="text-danger">*</span></label>
+                                <span class="badge bg-light text-muted border font-monospace" id="charCounter">0 chars</span>
+                            </div>
+                            <textarea id="content" class="form-control font-monospace text-dark" rows="6" placeholder="Type or paste the abusive, threatening, or harassing messages exactly as received..." required></textarea>
+                            <small class="text-muted">Do not modify spelling, punctuation, or timestamps. Raw text ensures mathematical hash fidelity.</small>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Optional Attachment (Screenshot / Photo / PDF)</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-paperclip"></i></span>
+                                <input type="file" id="attachment" class="form-control" accept=".png,.jpg,.jpeg,.pdf,.txt,.docx">
+                            </div>
+                            <small class="text-muted">Max file size: 10MB. File content will also be hashed with SHA-256.</small>
+                        </div>
+
+                        <!-- Section 4.1.2 Notice -->
+                        <div class="alert alert-info d-flex align-items-center gap-3 py-3 rounded-3 mb-4">
+                            <i class="bi bi-shield-lock-fill fs-3 text-primary"></i>
+                            <div class="small">
+                                <strong>Cryptographic Assurance:</strong> Your submission will be immediately timestamped, hashed with SHA-256, and encrypted with AES-256 upon submission to preserve its integrity under Ghana Evidence Law.
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 py-3 fw-bold shadow-sm" id="submitBtn">
+                            <i class="bi bi-fingerprint me-2"></i> Submit & Cryptographically Seal Evidence
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- SUCCESS RECEIPT MODAL -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
+            <div class="modal-header bg-navy text-white py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-check-circle-fill text-success me-2"></i> Evidence Captured & Fingerprinted</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <div class="display-6 fw-bold text-success mb-1">Receipt Confirmed</div>
+                    <p class="text-muted small">Your evidence has been encrypted and secured with an immutable digital fingerprint.</p>
+                </div>
+
+                <div class="card bg-light border-0 p-3 rounded-3 mb-3">
+                    <div class="small text-uppercase fw-bold text-muted mb-1">SHA-256 Digital Fingerprint</div>
+                    <div class="font-monospace text-primary fw-bold text-break bg-white p-2 rounded border" id="modalHashValue">
+                        ...
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <div class="card border p-3 rounded-3 h-100">
+                            <div class="small text-muted mb-1">Machine Learning Analysis</div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge" id="modalMlLabel">Abusive</span>
+                                <span class="badge" id="modalThreatLevel">High</span>
+                            </div>
+                            <div class="small text-muted mt-2" id="modalRiskSummary">Analysis details</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border p-3 rounded-3 h-100">
+                            <div class="small text-muted mb-1">Integrity & Storage State</div>
+                            <div class="fw-semibold text-dark"><i class="bi bi-lock-fill text-success me-1"></i> AES-256 Data Shuffled</div>
+                            <div class="small text-muted mt-1">Status: <span class="badge bg-secondary" id="modalStatus">Pending</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                    <a href="/track" class="btn btn-outline-secondary">
+                        <i class="bi bi-list-check me-1"></i> View in Tracking Dashboard
+                    </a>
+                    <a id="modalDownloadPdfBtn" href="#" class="btn btn-primary" target="_blank">
+                        <i class="bi bi-file-earmark-pdf-fill me-1"></i> Download Court Evidence Dossier (PDF)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    checkAuthUI();
+    const contentArea = document.getElementById("content");
+    const charCounter = document.getElementById("charCounter");
+    if (contentArea) {
+        contentArea.addEventListener("input", () => {
+            charCounter.textContent = `${contentArea.value.length} chars`;
+        });
+    }
+
+    const form = document.getElementById("evidenceForm");
+    if (form) {
+        form.addEventListener("submit", handleEvidenceSubmission);
+    }
+});
+</script>
+{% endblock %}

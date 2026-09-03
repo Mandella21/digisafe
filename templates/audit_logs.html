@@ -1,0 +1,72 @@
+﻿{% extends "base.html" %}
+
+{% block title %}System Audit Trail - DigiSafe{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="bi bi-journal-text text-primary me-2"></i> System Audit Trail</h3>
+            <p class="text-muted small mb-0">Immutable, chronological record of all administrative, forensic, and user actions.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="loadAuditLogs()">
+                <i class="bi bi-arrow-clockwise me-1"></i> Refresh Log
+            </button>
+            <a href="/api/admin/audit-logs/export-csv" class="btn btn-success btn-sm">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export to CSV
+            </a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold mb-0 text-dark">Audit Event Stream (Section 3.15.1)</h6>
+            <div class="d-flex gap-2">
+                <select id="auditActionFilter" class="form-select form-select-sm" onchange="loadAuditLogs()">
+                    <option value="all">All Actions</option>
+                    <option value="SUBMIT_EVIDENCE">Evidence Submissions</option>
+                    <option value="VERIFY_INTEGRITY_PASS">Integrity Passes</option>
+                    <option value="CHECKSUM_MISMATCH">Checksum Mismatches (Tampering)</option>
+                    <option value="GENERATE_PDF_REPORT">PDF Report Generations</option>
+                    <option value="USER_LOGIN">User Logins</option>
+                    <option value="USER_REGISTER">User Registrations</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle mb-0 font-monospace small">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Timestamp</th>
+                        <th>Actor</th>
+                        <th>Role</th>
+                        <th>Action</th>
+                        <th>Entity</th>
+                        <th>Audit Details</th>
+                    </tr>
+                </thead>
+                <tbody id="auditLogsBody">
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                            Loading audit log stream...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    checkAuthUI();
+    loadAuditLogs();
+});
+</script>
+{% endblock %}

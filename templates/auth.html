@@ -1,0 +1,142 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Sign In / Register - DigiSafe{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-5">
+
+            <!-- Fast Switch Card for Examiners -->
+            <div class="card border-warning shadow-sm mb-4 bg-warning-subtle">
+                <div class="card-body py-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-lightning-charge-fill text-warning fs-5"></i>
+                        <h6 class="mb-0 fw-bold text-dark">One-Click Demonstration Logins</h6>
+                    </div>
+                    <p class="small text-muted mb-2">Select a pre-configured role to immediately test system capabilities:</p>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-sm btn-outline-dark text-start bg-white" onclick="quickLogin('victim')">
+                            <i class="bi bi-person-fill text-primary me-2"></i><strong>Victim Account:</strong> victim@digisafe.org
+                        </button>
+                        <button class="btn btn-sm btn-outline-dark text-start bg-white" onclick="quickLogin('officer')">
+                            <i class="bi bi-shield-fill text-danger me-2"></i><strong>Police Officer:</strong> officer@police.gov.gh
+                        </button>
+                        <button class="btn btn-sm btn-outline-dark text-start bg-white" onclick="quickLogin('admin')">
+                            <i class="bi bi-gear-fill text-dark me-2"></i><strong>Administrator:</strong> admin@digisafe.org
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-navy text-white text-center py-4">
+                    <span class="brand-icon mb-2 d-inline-block"><i class="bi bi-shield-lock fs-2"></i></span>
+                    <h4 class="fw-bold mb-1">DigiSafe Authentication</h4>
+                    <p class="small text-white-50 mb-0">Role-Based Access Control with JWT & bcrypt</p>
+                </div>
+
+                <div class="card-body p-4">
+                    <!-- Nav Tabs -->
+                    <ul class="nav nav-pills nav-fill mb-4" id="authTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active fw-semibold" id="login-tab" data-bs-toggle="tab" data-bs-target="#login-pane" type="button" role="tab">
+                                <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-semibold" id="register-tab" data-bs-toggle="tab" data-bs-target="#register-pane" type="button" role="tab">
+                                <i class="bi bi-person-plus me-1"></i> Register
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="authTabsContent">
+                        <!-- LOGIN PANE -->
+                        <div class="tab-pane fade show active" id="login-pane" role="tabpanel">
+                            <form id="loginForm">
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Email Address</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                        <input type="email" id="loginEmail" class="form-control" placeholder="name@example.com" required>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Password</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-key"></i></span>
+                                        <input type="password" id="loginPassword" class="form-control" placeholder="Enter your password" required>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label fw-semibold">Intended Role</label>
+                                    <select id="loginRole" class="form-select">
+                                        <option value="victim" selected>Victim (Complainant)</option>
+                                        <option value="officer">Law Enforcement Officer</option>
+                                        <option value="admin">System Administrator</option>
+                                    </select>
+                                    <small class="text-muted">Directs you to the corresponding dashboard upon sign-in.</small>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold" id="loginBtn">
+                                    <i class="bi bi-lock me-1"></i> Secure Sign In
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- REGISTER PANE -->
+                        <div class="tab-pane fade" id="register-pane" role="tabpanel">
+                            <form id="registerForm">
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Full Legal Name</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                        <input type="text" id="regName" class="form-control" placeholder="e.g. Abena Mensah" required>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Email Address</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                        <input type="email" id="regEmail" class="form-control" placeholder="name@example.com" required>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Password</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-key"></i></span>
+                                        <input type="password" id="regPassword" class="form-control" placeholder="Choose a secure password" required minlength="6">
+                                    </div>
+                                    <small class="text-muted">Minimum 6 characters. Encrypted via bcrypt.</small>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label fw-semibold">Account Role</label>
+                                    <select id="regRole" class="form-select">
+                                        <option value="victim" selected>Victim (Complainant / Student)</option>
+                                        <option value="officer">Law Enforcement Officer (Investigator)</option>
+                                        <option value="admin">System Administrator</option>
+                                    </select>
+                                </div>
+
+                                <button type="submit" class="btn btn-success w-100 py-2 fw-semibold" id="regBtn">
+                                    <i class="bi bi-person-check me-1"></i> Create Secure Account
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-footer bg-light text-center py-3 small text-muted">
+                    <i class="bi bi-shield-shaded text-success me-1"></i> Data confidentiality protected under Ghana Data Protection Act 2012 (Act 843)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

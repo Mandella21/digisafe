@@ -1,0 +1,125 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DigiSafe - Digital Safety & Evidence Protection{% endblock %}</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="bg-light d-flex flex-column min-vh-100">
+
+    <!-- Top Emergency Helpline Bar -->
+    <div class="bg-dark text-white py-1 px-3 small border-bottom border-secondary d-flex justify-content-between align-items-center">
+        <div>
+            <i class="bi bi-shield-fill-exclamation text-warning me-1"></i>
+            <strong>Confidential Support Helpline:</strong> Ghana Cyber Security Authority <strong>992</strong> | DOVVSU <strong>0800 000 900</strong>
+        </div>
+        <div class="d-none d-md-block text-muted">
+            <i class="bi bi-lock-fill text-success"></i> SHA-256 Cryptographic Integrity | Act 775 & Act 29 Compliant
+        </div>
+    </div>
+
+    <!-- Main Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-navy shadow-sm sticky-top">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+                <span class="brand-icon"><i class="bi bi-shield-check"></i></span>
+                <span class="fw-bold tracking-tight">Digi<span class="text-info">Safe</span></span>
+            </a>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navMain">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/"><i class="bi bi-house-door me-1"></i> Home</a>
+                    </li>
+                    <li class="nav-item" id="navSubmitItem">
+                        <a class="nav-link" href="/submit"><i class="bi bi-plus-circle me-1"></i> Submit Evidence</a>
+                    </li>
+                    <li class="nav-item" id="navTrackItem">
+                        <a class="nav-link" href="/track"><i class="bi bi-folder2-open me-1"></i> My Evidence</a>
+                    </li>
+                    <li class="nav-item" id="navAdminItem">
+                        <a class="nav-link text-warning" href="/admin"><i class="bi bi-shield-lock me-1"></i> Law Enforcement / Admin</a>
+                    </li>
+                    <li class="nav-item" id="navAuditItem">
+                        <a class="nav-link" href="/audit"><i class="bi bi-journal-text me-1"></i> Audit Trail</a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center gap-2" id="authNavContainer">
+                    <!-- Dynamic auth badges injected via app.js -->
+                    <a href="/auth" class="btn btn-outline-light btn-sm px-3"><i class="bi bi-box-arrow-in-right me-1"></i> Login / Register</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Notification Toast Container -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+        <div id="liveToast" class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="toastMessage">Action notification</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Body Content -->
+    <main class="flex-grow-1">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-navy text-white-50 py-4 mt-5 border-top border-secondary">
+        <div class="container text-center text-md-start">
+            <div class="row gy-3">
+                <div class="col-md-6">
+                    <h6 class="text-white fw-bold"><i class="bi bi-shield-check text-info me-1"></i> DigiSafe System</h6>
+                    <p class="small mb-0">
+                        Design and Implementation of a Digital Safety and Record Protection System for Online Abuse Victims.
+                        Developed for Academic Evaluation & Law Enforcement Integration.
+                    </p>
+                    <p class="small text-muted mt-1">
+                        Kwame Nkrumah University of Science and Technology (KNUST) &bull; Department of Computer Science
+                    </p>
+                </div>
+                <div class="col-md-3">
+                    <h6 class="text-white fw-bold">Legal Mandate</h6>
+                    <ul class="list-unstyled small mb-0">
+                        <li><i class="bi bi-check2 text-success me-1"></i> Electronic Communications Act (Act 775)</li>
+                        <li><i class="bi bi-check2 text-success me-1"></i> Criminal Offences Act (Act 29)</li>
+                        <li><i class="bi bi-check2 text-success me-1"></i> NIST FIPS 180-4 (SHA-256)</li>
+                    </ul>
+                </div>
+                <div class="col-md-3 text-md-end">
+                    <h6 class="text-white fw-bold">Quick Switch</h6>
+                    <div class="btn-group-vertical btn-group-sm w-100">
+                        <button class="btn btn-outline-secondary text-start text-white-50" onclick="quickLogin('victim')"><i class="bi bi-person me-1"></i> Demo Victim</button>
+                        <button class="btn btn-outline-secondary text-start text-white-50" onclick="quickLogin('officer')"><i class="bi bi-shield me-1"></i> Demo Officer</button>
+                        <button class="btn btn-outline-secondary text-start text-white-50" onclick="quickLogin('admin')"><i class="bi bi-gear me-1"></i> Demo Admin</button>
+                    </div>
+                </div>
+            </div>
+            <hr class="border-secondary my-3">
+            <div class="d-flex justify-content-between flex-column flex-md-row small">
+                <div>&copy; 2026 DigiSafe Platform. All digital records cryptographically verified.</div>
+                <div>Supervised by Prof. Frimpong Twum &bull; KNUST</div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

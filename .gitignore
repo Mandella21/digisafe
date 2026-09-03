@@ -1,0 +1,16 @@
+﻿__pycache__/
+*.py[cod]
+*$py.class
+*.log
+.env
+.venv
+env/
+venv/
+storage/evidence_files/*
+!storage/evidence_files/.gitkeep
+storage/reports/*
+!storage/reports/.gitkeep
+digisafe.db
+extracted_doc_summary.txt
+chapters_3_and_4.txt
+test_here.py
