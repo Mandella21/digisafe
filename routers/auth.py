@@ -18,13 +18,23 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             detail="A user with this email address already exists."
         )
 
-    valid_role = payload.role.lower() if payload.role and payload.role.lower() in ["victim", "admin", "officer"] else "victim"
-
+    # SECURITY: public self-registration ALWAYS creates a victim account.
+    #
+    # The role in the request body is deliberately ignored. Honouring it would
+    # let any member of the public register with {"role": "admin"} and
+    # immediately read every victim's evidence, which is a total compromise of
+    # the confidentiality guarantee in Section 3.10 and of the role-based access
+    # restriction required by Section 3.8.2.
+    #
+    # Privileged accounts (administrator, law enforcement officer) are created
+    # by an existing administrator through POST /api/admin/users, which matches
+    # Section 3.6: the System Administrator is the stakeholder "responsible for
+    # managing user accounts".
     new_user = User(
         full_name=payload.full_name.strip(),
         email=email_clean,
         password_hash=hash_password(payload.password),
-        role=valid_role
+        role="victim"
     )
     db.add(new_user)
     db.commit()
@@ -35,7 +45,15 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         action="USER_REGISTER",
         entity_type="User",
         entity_id=new_user.user_id,
-        details=f"New user registered: {new_user.email} (Role: {new_user.role})"
+        details=(
+            f"New user registered: {new_user.email} (Role: {new_user.role})"
+            + (
+                f" | NOTE: request asked for role '{payload.role}' and was "
+                f"downgraded to victim by policy."
+                if payload.role and payload.role.strip().lower() not in ("", "victim")
+                else ""
+            )
+        )
     ))
     db.commit()
 

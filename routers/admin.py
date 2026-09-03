@@ -12,7 +12,8 @@ from models.audit_log import AuditLog
 from models.alert import Alert
 from services.encryption_service import decrypt_content
 from services.hashing_service import verify_and_recover
-from schemas.admin import DashboardStats, FlagCaseRequest
+from core.security import hash_password
+from schemas.admin import DashboardStats, FlagCaseRequest, CreateStaffRequest, StaffCreatedResponse
 
 router = APIRouter()
 
@@ -125,6 +126,72 @@ def simulate_tampering(
         "action": "Tampering simulated on record",
         "verification_result": result
     }
+
+@router.post("/users", response_model=StaffCreatedResponse, status_code=status.HTTP_201_CREATED)
+def create_staff_account(
+    payload: CreateStaffRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin"])),
+):
+    """Create an administrator or law enforcement officer account.
+
+    Restricted to administrators. This exists because public registration
+    always produces a victim account - a privileged role can never be
+    self-assigned - so there has to be a controlled path for provisioning
+    staff. Section 3.6 assigns this responsibility to the System Administrator.
+    """
+    requested_role = (payload.role or "").strip().lower()
+    if requested_role not in ("admin", "officer"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Role must be either 'admin' or 'officer'.",
+        )
+
+    email_clean = payload.email.strip().lower()
+    if db.query(User).filter(User.email == email_clean).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A user with this email address already exists.",
+        )
+
+    if len(payload.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Privileged accounts require a password of at least 8 characters.",
+        )
+
+    staff = User(
+        full_name=payload.full_name.strip(),
+        email=email_clean,
+        password_hash=hash_password(payload.password),
+        role=requested_role,
+    )
+    db.add(staff)
+    db.commit()
+    db.refresh(staff)
+
+    # Creating a privileged account is exactly the kind of action the audit log
+    # exists for (Section 3.8.2: log every administrative action).
+    db.add(AuditLog(
+        user_id=current_user.user_id,
+        action="STAFF_ACCOUNT_CREATED",
+        entity_type="User",
+        entity_id=staff.user_id,
+        details=(
+            f"Administrator {current_user.email} created {staff.role} "
+            f"account for {staff.email}"
+        ),
+    ))
+    db.commit()
+
+    return StaffCreatedResponse(
+        user_id=staff.user_id,
+        full_name=staff.full_name,
+        email=staff.email,
+        role=staff.role,
+        message=f"{staff.role.capitalize()} account created successfully.",
+    )
+
 
 @router.get("/audit-logs")
 def get_audit_logs(

@@ -117,11 +117,14 @@
 
                                 <div class="mb-4">
                                     <label class="form-label fw-semibold">Account Role</label>
-                                    <select id="regRole" class="form-select">
-                                        <option value="victim" selected>Victim (Complainant / Student)</option>
-                                        <option value="officer">Law Enforcement Officer (Investigator)</option>
-                                        <option value="admin">System Administrator</option>
-                                    </select>
+                                    <input type="text" class="form-control" value="Victim (Complainant)" disabled readonly>
+                                    <input type="hidden" id="regRole" value="victim">
+                                    <div class="form-text">
+                                        <i class="bi bi-shield-lock me-1"></i>
+                                        Public sign-up creates a victim account. Law enforcement and
+                                        administrator accounts are issued by a system administrator,
+                                        so nobody can grant themselves access to other people's evidence.
+                                    </div>
                                 </div>
 
                                 <button type="submit" class="btn btn-success w-100 py-2 fw-semibold" id="regBtn">

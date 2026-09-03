@@ -71,6 +71,25 @@ models are committed, so no training step is needed to run the project.
 
 One-click login buttons for each are on the sign-in page.
 
+### Account roles
+
+**Public sign-up always creates a victim account.** The role field in a
+registration request is ignored by the server. Honouring it would let anyone
+register as an administrator and read every victim's evidence, so privileged
+accounts can never be self-assigned.
+
+Administrator and law enforcement officer accounts are provisioned by an
+existing administrator:
+
+```
+POST /api/admin/users     { full_name, email, password, role: "admin" | "officer" }
+```
+
+Only an administrator may call it — officers are deliberately not allowed to
+create further staff accounts. Every such creation is written to the audit log.
+This matches Section 3.6, which makes the System Administrator responsible for
+managing user accounts.
+
 ### Retraining the classifier
 
 ```bash

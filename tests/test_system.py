@@ -204,6 +204,81 @@ class TestDigiSafeDirect(unittest.TestCase):
         self.assertGreaterEqual(len(result["detected_categories"]), 2)
         self.assertEqual(result["threat_level"], "Critical")
 
+    def test_04f_public_registration_cannot_self_assign_privileged_roles(self):
+        """SECURITY REGRESSION (Sections 3.8.2 / 3.10).
+
+        Public registration must always produce a victim account. Honouring a
+        client-supplied role would let any member of the public register as
+        {"role": "admin"} and read every victim's evidence.
+        """
+        from fastapi.testclient import TestClient
+        from main import app
+
+        with TestClient(app) as client:
+            for attempted_role in ("admin", "officer", "ADMIN", "Admin"):
+                with self.subTest(role=attempted_role):
+                    response = client.post("/api/auth/register", json={
+                        "full_name": "Privilege Escalation Probe",
+                        "email": f"probe-{attempted_role.lower()}-{os.urandom(4).hex()}@example.com",
+                        "password": "Probe@12345",
+                        "role": attempted_role,
+                    })
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(
+                        response.json()["role"], "victim",
+                        f"Registration granted '{attempted_role}' to a public sign-up",
+                    )
+
+                    # And the token it issued must be refused by admin endpoints.
+                    token = response.json()["access_token"]
+                    denied = client.get(
+                        "/api/admin/stats",
+                        headers={"Authorization": f"Bearer {token}"},
+                    )
+                    self.assertEqual(
+                        denied.status_code, 403,
+                        "A self-registered account reached an admin endpoint",
+                    )
+
+    def test_04g_only_admins_may_create_staff_accounts(self):
+        """The controlled path for privileged accounts must itself be guarded."""
+        from fastapi.testclient import TestClient
+        from main import app
+
+        with TestClient(app) as client:
+            victim = client.post("/api/auth/login", json={
+                "email": "victim@digisafe.org", "password": "Victim@123",
+            })
+            victim_token = victim.json()["access_token"]
+
+            blocked = client.post(
+                "/api/admin/users",
+                headers={"Authorization": f"Bearer {victim_token}"},
+                json={
+                    "full_name": "Sneaky Officer", "email": "sneaky@example.com",
+                    "password": "Sneaky@12345", "role": "officer",
+                },
+            )
+            self.assertEqual(blocked.status_code, 403)
+
+            admin = client.post("/api/auth/login", json={
+                "email": "admin@digisafe.org", "password": "Admin@123",
+            })
+            admin_token = admin.json()["access_token"]
+
+            created = client.post(
+                "/api/admin/users",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                json={
+                    "full_name": "DSP Kwame Officer",
+                    "email": f"officer-{os.urandom(4).hex()}@police.gov.gh",
+                    "password": "Officer@12345",
+                    "role": "officer",
+                },
+            )
+            self.assertEqual(created.status_code, 201)
+            self.assertEqual(created.json()["role"], "officer")
+
     def test_05_checksum_data_recovery_and_tamper_detection(self):
         """Test Section 4.1.8 Checksum Data Recovery Technique (IT-02)."""
         ev = self._fixture_evidence()
