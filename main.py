@@ -43,6 +43,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # The browser branches on this header to tell "wrong password" apart from
+    # "correct password, email not confirmed yet" and open the verification
+    # screen instead of a dead end. Custom headers are invisible to
+    # cross-origin JavaScript unless they are named here, so a front end served
+    # from anywhere but this origin would silently lose that distinction.
+    expose_headers=["X-DigiSafe-Reason"],
 )
 
 # Mount Static & Storage Assets

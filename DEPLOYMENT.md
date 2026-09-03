@@ -1,4 +1,4 @@
-﻿# DigiSafe: Deployment & Hosting Guide
+# DigiSafe: Deployment & Hosting Guide
 
 This guide provides step-by-step instructions to run **DigiSafe** locally and deploy it online to **Render.com** (or Railway / Docker) before your Friday deadline.
 
@@ -34,11 +34,55 @@ This guide provides step-by-step instructions to run **DigiSafe** locally and de
    http://127.0.0.1:8000
    ```
 
-6. Pre-configured demonstration accounts are already initialized:
+6. Create an account by signing up at `/auth`. A 6-digit verification code is
+   sent to the address you register with, and the account cannot sign in until
+   that code is entered at `/verify` (or the link in the same email is tapped).
+
+   **No mail server is required to run this.** With SMTP unconfigured the code
+   is printed in the terminal running the server, and a copy of the message is
+   written to `storage/outbox/`. To send real email, see
+   [EMAIL_SETUP.md](EMAIL_SETUP.md).
+
+7. *(Optional)* Bring back the pre-configured demonstration accounts:
+
+   ```bash
+   set DIGISAFE_SEED_DEMO=true        # Windows
+   export DIGISAFE_SEED_DEMO=true     # macOS / Linux
+   ```
+
    - **Victim Complainant**: `victim@digisafe.org` / `Victim@123`
    - **Police Officer**: `officer@police.gov.gh` / `Officer@123`
    - **System Administrator**: `admin@digisafe.org` / `Admin@123`
-   *(Tip: You can also use the 1-click quick login buttons directly on the UI)*
+
+   These are seeded already verified, and 1-click login buttons appear on the
+   sign-in page. They are **off by default**: on a live deployment those buttons
+   would hand any visitor an administrator session.
+
+---
+
+## 1b. Reaching the site from your phone
+
+**Same Wi-Fi as the computer** — bind to every interface instead of loopback:
+
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Find the computer's IP (`ipconfig` on Windows, `ifconfig` on macOS/Linux) and
+open `http://<that-ip>:8000` on the phone. `127.0.0.1` means "this machine
+only", which is why the default will not work from another device.
+
+**From anywhere** — double-click `START_LIVE_SITE.bat`. It starts the server and
+opens a Cloudflare tunnel, then prints a public `https://....trycloudflare.com`
+address that works on mobile data, on another network, on anyone's phone. Keep
+that window open; closing it takes the site offline, and the address changes
+each time you run it.
+
+Verification links adapt automatically: the link inside the email is built from
+the address the browser actually used, so it points at the tunnel when you are
+tunnelled and at the LAN address when you are on Wi-Fi. The typed 6-digit code
+works regardless of address, which is what keeps the flow intact when a tunnel
+restarts with a new hostname.
 
 ---
 
@@ -94,6 +138,23 @@ Render provides free hosting for Python web services with HTTPS enabled out of t
    | `PYTHON_VERSION` | `3.12.7` |
    | `SECRET_KEY` | any long random string (signs the JWTs) |
    | `DIGISAFE_AES_KEY` | exactly 32 characters (AES-256 evidence encryption) |
+   | `APP_BASE_URL` | your live address, e.g. `https://digisafe-knust.onrender.com` |
+   | `SMTP_HOST` | e.g. `smtp.gmail.com` (optional - see below) |
+   | `SMTP_PORT` | `587` |
+   | `SMTP_USER` | the sending address |
+   | `SMTP_PASSWORD` | an app password, never your account password |
+   | `MAIL_FROM` | the sending address |
+
+   The `SMTP_*` group is optional. Leave it out and the platform still works -
+   verification codes go to the Render service log instead of an inbox, which is
+   enough to demonstrate the flow but not enough for real users, who cannot read
+   your logs. [EMAIL_SETUP.md](EMAIL_SETUP.md) walks through getting a Gmail app
+   password in about three minutes.
+
+   Set `APP_BASE_URL` once the service has its final address. Leaving it unset
+   still works - the link is then taken from each request - but pinning it also
+   stops a forged `Host` header from putting another domain into a verification
+   link.
 
    `DIGISAFE_AES_KEY` **must stay the same across deploys**. Changing it makes
    every evidence record already in the database undecryptable — for this system
@@ -216,8 +277,17 @@ Access at `http://localhost:8000`.
 ## 5. Defense & Demonstration Checklist
 
 During your project defense with your supervisor (Prof. Frimpong Twum) and panel:
+0. **Registration & Email Verification (Section 3.8.2)**:
+   - Sign up at `/auth` with a real address, on a phone if you like
+   - Show that `/api/auth/login` refuses the account at this point, *with the
+     correct password* — an unverified address is an unowned address
+   - Enter the emailed code (or tap the link) and watch the same login succeed
+   - Point out that the code is single-use, expires, is compared in constant
+     time, and is cancelled after 8 wrong guesses
+   - Open `/audit` afterwards to show `USER_REGISTER` and `EMAIL_VERIFIED`
+     recorded against the new account
 1. **Victim Workflow**:
-   - Log in using `victim@digisafe.org`
+   - Log in using the account you just verified
    - Go to **Submit Evidence**: enter a threat message (e.g., WhatsApp threat) and optional screenshot
    - Observe instant SHA-256 digital fingerprint and ML threat score (`Critical` or `High`)
    - Go to **Tracking Dashboard** and download the **Court-Admissible PDF Report**

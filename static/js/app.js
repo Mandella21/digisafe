@@ -100,6 +100,13 @@ if (loginForm) {
                 setUser({ user_id: data.user_id, full_name: data.full_name, email: data.email, role: data.role });
                 showToast("Signed in successfully!", "success");
                 setTimeout(() => { window.location.href = (data.role === "admin" || data.role === "officer") ? "/admin" : "/track"; }, 500);
+            } else if (res.status === 403 && res.headers.get("X-DigiSafe-Reason") === "email-unverified") {
+                // The password was right; the address was simply never confirmed.
+                // Carrying the email across means they land on the verification
+                // page with the field already filled, rather than on a dead end.
+                showToast("Please confirm your email address to finish signing in.", "info");
+                sessionStorage.setItem("digisafe_pending_email", email);
+                setTimeout(() => { window.location.href = "/verify"; }, 900);
             } else { showToast(data.detail || "Invalid credentials.", "error"); }
         } catch (err) { showToast("Network error: " + err.message, "error"); }
     });
@@ -134,10 +141,19 @@ if (registerForm) {
             });
             const data = await res.json();
             if (res.ok) {
-                setToken(data.access_token);
-                setUser({ user_id: data.user_id, full_name: data.full_name, email: data.email, role: data.role });
-                showToast("Account created successfully!", "success");
-                setTimeout(() => { window.location.href = (data.role === "admin" || data.role === "officer") ? "/admin" : "/track"; }, 500);
+                // Sign-up no longer signs anyone in. The account exists but is
+                // inert until the code that just went to their inbox is entered,
+                // so the next stop is the verification page - never a dashboard.
+                if (data.verification_required === false) {
+                    showToast("Account created. You can sign in now.", "success");
+                    setTimeout(() => { window.location.href = "/auth"; }, 900);
+                    return;
+                }
+                sessionStorage.setItem("digisafe_pending_email", data.email);
+                sessionStorage.setItem("digisafe_pending_message", data.message || "");
+                sessionStorage.setItem("digisafe_pending_delivery", data.delivery || "smtp");
+                showToast(data.email_sent ? "Account created - check your email for the code." : "Account created.", "success");
+                setTimeout(() => { window.location.href = "/verify"; }, 700);
             } else { showToast(data.detail || "Registration failed.", "error"); }
         } catch (err) { showToast("Error: " + err.message, "error"); }
     });
@@ -498,4 +514,177 @@ if (regPwd && regPwdConfirm && regPwdMatch) {
     };
     regPwd.addEventListener("input", checkMatch);
     regPwdConfirm.addEventListener("input", checkMatch);
+}
+
+
+/* ======================================================================
+   EMAIL VERIFICATION  (/verify)
+   ======================================================================
+   Serves both arrivals: someone redirected here from sign-up who types the
+   6-digit code, and someone who simply tapped the button in the email, whose
+   URL carries ?token=... and who should not have to type anything at all.
+   ====================================================================== */
+
+function finishVerification(data) {
+    setToken(data.access_token);
+    setUser({ user_id: data.user_id, full_name: data.full_name, email: data.email, role: data.role });
+    sessionStorage.removeItem("digisafe_pending_email");
+    sessionStorage.removeItem("digisafe_pending_message");
+    sessionStorage.removeItem("digisafe_pending_delivery");
+
+    const codeState = document.getElementById("codeVerifyState");
+    const tokenState = document.getElementById("tokenVerifyState");
+    const doneState = document.getElementById("verifiedState");
+    if (codeState) codeState.classList.add("d-none");
+    if (tokenState) tokenState.classList.add("d-none");
+    if (doneState) doneState.classList.remove("d-none");
+
+    showToast("Email confirmed. Welcome to DigiSafe, " + (data.full_name || "") + "!", "success");
+    setTimeout(() => {
+        window.location.href = (data.role === "admin" || data.role === "officer") ? "/admin" : "/track";
+    }, 1100);
+}
+
+const verifyForm = document.getElementById("verifyForm");
+if (verifyForm) {
+    const emailField = document.getElementById("verifyEmail");
+    const codeField = document.getElementById("verifyCode");
+    const introText = document.getElementById("verifyIntroText");
+    const consoleNotice = document.getElementById("consoleCodeNotice");
+    const verifyBtn = document.getElementById("verifyBtn");
+    const resendBtn = document.getElementById("resendBtn");
+
+    // Carried over from sign-up (or from a login blocked for being unverified)
+    // so the address does not have to be retyped on a phone keyboard.
+    const pendingEmail = sessionStorage.getItem("digisafe_pending_email");
+    if (pendingEmail && emailField) emailField.value = pendingEmail;
+
+    const pendingMessage = sessionStorage.getItem("digisafe_pending_message");
+    if (pendingMessage && introText) introText.textContent = pendingMessage;
+
+    const pendingDelivery = sessionStorage.getItem("digisafe_pending_delivery");
+    if (consoleNotice && (pendingDelivery === "outbox" || pendingDelivery === "failed")) {
+        consoleNotice.classList.remove("d-none");
+    }
+
+    // Digits only, and never more than six - so a code pasted with spaces or a
+    // stray character still lands cleanly.
+    if (codeField) {
+        codeField.addEventListener("input", () => {
+            codeField.value = codeField.value.replace(/\D/g, "").slice(0, 6);
+        });
+    }
+
+    verifyForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = (emailField.value || "").trim();
+        const code = (codeField.value || "").trim();
+        if (!email) { showToast("Please enter the email address you registered with.", "error"); emailField.focus(); return; }
+        if (code.length !== 6) { showToast("The code is 6 digits long.", "error"); codeField.focus(); return; }
+
+        verifyBtn.disabled = true;
+        const originalLabel = verifyBtn.innerHTML;
+        verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verifying...';
+        try {
+            const res = await fetch("/api/auth/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, code })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                finishVerification(data);
+            } else {
+                showToast(data.detail || "Verification failed.", "error");
+                codeField.value = "";
+                codeField.focus();
+                verifyBtn.disabled = false;
+                verifyBtn.innerHTML = originalLabel;
+            }
+        } catch (err) {
+            showToast("Network error: " + err.message, "error");
+            verifyBtn.disabled = false;
+            verifyBtn.innerHTML = originalLabel;
+        }
+    });
+
+    if (resendBtn) {
+        const resendLabel = resendBtn.innerHTML;
+        resendBtn.addEventListener("click", async () => {
+            const email = (emailField.value || "").trim();
+            if (!email) { showToast("Enter your email address first.", "error"); emailField.focus(); return; }
+
+            resendBtn.disabled = true;
+            try {
+                const res = await fetch("/api/auth/resend-verification", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message || "A new code is on its way.", "success");
+                    if (introText && data.message) introText.textContent = data.message;
+                    if (consoleNotice) {
+                        consoleNotice.classList.toggle("d-none", data.delivery === "smtp");
+                    }
+                    // Mirror the server cooldown, so the button cannot be tapped
+                    // into a 429 the person did not cause.
+                    let seconds = 60;
+                    const paint = () => {
+                        resendBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> You can resend in ' + seconds + 's';
+                    };
+                    paint();
+                    const tick = setInterval(() => {
+                        seconds -= 1;
+                        if (seconds <= 0) {
+                            clearInterval(tick);
+                            resendBtn.innerHTML = resendLabel;
+                            resendBtn.disabled = false;
+                        } else {
+                            paint();
+                        }
+                    }, 1000);
+                } else {
+                    showToast(data.detail || "Could not resend the code.", "error");
+                    resendBtn.disabled = false;
+                }
+            } catch (err) {
+                showToast("Network error: " + err.message, "error");
+                resendBtn.disabled = false;
+            }
+        });
+    }
+
+    // Arrived from the emailed link: exchange the token without asking for
+    // anything. The token is dropped from the address bar afterwards so it is
+    // not left sitting in browser history or in a shared screenshot.
+    const urlToken = new URLSearchParams(window.location.search).get("token");
+    if (urlToken) {
+        document.getElementById("codeVerifyState").classList.add("d-none");
+        document.getElementById("tokenVerifyState").classList.remove("d-none");
+        (async () => {
+            try {
+                const res = await fetch("/api/auth/verify-token", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ token: urlToken })
+                });
+                const data = await res.json();
+                window.history.replaceState({}, document.title, "/verify");
+                if (res.ok) {
+                    finishVerification(data);
+                } else {
+                    document.getElementById("tokenVerifyState").classList.add("d-none");
+                    document.getElementById("codeVerifyState").classList.remove("d-none");
+                    if (introText) introText.textContent = data.detail || "That link did not work. Enter your code below instead.";
+                    showToast(data.detail || "That verification link did not work.", "error");
+                }
+            } catch (err) {
+                document.getElementById("tokenVerifyState").classList.add("d-none");
+                document.getElementById("codeVerifyState").classList.remove("d-none");
+                showToast("Network error: " + err.message, "error");
+            }
+        })();
+    }
 }

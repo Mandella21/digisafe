@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Verify your email - DigiSafe{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-md-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-7 col-lg-5">
+
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-navy text-white text-center py-4">
+                    <span class="brand-icon mb-2 d-inline-block"><i class="bi bi-envelope-check fs-2"></i></span>
+                    <h4 class="fw-bold mb-1">Confirm your email</h4>
+                    <p class="small text-white-50 mb-0">One step left before your account is active</p>
+                </div>
+
+                <div class="card-body p-4">
+
+                    <!--
+                      Shown while the link in the email is being exchanged for a
+                      session. Nothing is typed on this path; it is the whole
+                      point of the link.
+                    -->
+                    <div id="tokenVerifyState" class="text-center py-4 d-none">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Verifying</span>
+                        </div>
+                        <p class="mb-0 text-muted">Verifying your account&hellip;</p>
+                    </div>
+
+                    <div id="codeVerifyState">
+                        <div id="verifyIntro" class="alert alert-info d-flex gap-2 small" role="status">
+                            <i class="bi bi-info-circle-fill flex-shrink-0 mt-1"></i>
+                            <div id="verifyIntroText">
+                                Enter the 6-digit code we sent to your email address.
+                            </div>
+                        </div>
+
+                        <form id="verifyForm" novalidate>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold" for="verifyEmail">Email address</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                    <input type="email" id="verifyEmail" class="form-control"
+                                           placeholder="name@example.com" autocomplete="email" required>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold" for="verifyCode">6-digit code</label>
+                                <!--
+                                  inputmode="numeric" brings up the number pad rather
+                                  than the full keyboard on a phone, and
+                                  autocomplete="one-time-code" lets iOS and Android
+                                  offer the code straight from the notification, so
+                                  it never has to be memorised across apps.
+                                -->
+                                <input type="text" id="verifyCode" class="form-control form-control-lg text-center verify-code-input"
+                                       inputmode="numeric" pattern="[0-9]*" maxlength="6"
+                                       autocomplete="one-time-code" placeholder="000000"
+                                       aria-describedby="verifyCodeHelp" required>
+                                <small id="verifyCodeHelp" class="text-muted">
+                                    The code expires a short while after it is sent.
+                                </small>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold" id="verifyBtn">
+                                <i class="bi bi-check2-circle me-1"></i> Verify and sign in
+                            </button>
+                        </form>
+
+                        <div class="text-center mt-3">
+                            <button type="button" class="btn btn-link btn-sm text-decoration-none" id="resendBtn">
+                                <i class="bi bi-arrow-repeat me-1"></i> Didn't get it? Send another code
+                            </button>
+                        </div>
+
+                        <!--
+                          Only appears when the server reports that no mail was
+                          actually sent. Saying "check your inbox" when nothing
+                          left the building would leave someone waiting forever.
+                        -->
+                        <div id="consoleCodeNotice" class="alert alert-warning small mt-3 d-none">
+                            <div class="fw-semibold mb-1">
+                                <i class="bi bi-terminal me-1"></i> No mail server is configured
+                            </div>
+                            <div class="mb-0">
+                                Nothing was emailed. Your verification code was printed in the
+                                window running the server, and a copy of the message was saved to
+                                <code>storage/outbox/</code>. See <code>EMAIL_SETUP.md</code> to
+                                send real email.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="verifiedState" class="text-center py-4 d-none">
+                        <div class="display-5 text-success mb-2"><i class="bi bi-patch-check-fill"></i></div>
+                        <h5 class="fw-bold">Email confirmed</h5>
+                        <p class="text-muted small mb-0">Signing you in&hellip;</p>
+                    </div>
+
+                </div>
+
+                <div class="card-footer bg-light text-center py-3 small text-muted">
+                    Wrong address? <a href="/auth" class="text-decoration-none">Start again</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

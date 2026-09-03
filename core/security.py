@@ -55,6 +55,18 @@ def get_current_user(token: Optional[str] = Depends(oauth2_scheme), db: Session 
     user = db.query(User).filter(User.user_id == user_id).first()
     if user is None:
         raise credentials_exception
+
+    # Defence in depth. /login already refuses an unverified account, so a
+    # token should never reach here for one - but "should never" is not a
+    # control. Re-checking on every authenticated request means a token minted
+    # before verification was enforced, or kept from a window when it was
+    # switched off, still cannot touch a victim's evidence.
+    if settings.REQUIRE_EMAIL_VERIFICATION and not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email address before using this account.",
+            headers={"X-DigiSafe-Reason": "email-unverified"},
+        )
     return user
 
 def require_roles(allowed_roles: List[str]):

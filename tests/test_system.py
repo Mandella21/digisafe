@@ -234,23 +234,33 @@ class TestDigiSafeDirect(unittest.TestCase):
         with TestClient(app) as client:
             for attempted_role in ("admin", "officer", "ADMIN", "Admin"):
                 with self.subTest(role=attempted_role):
+                    email = f"probe-{attempted_role.lower()}-{os.urandom(4).hex()}@example.com"
                     response = client.post("/api/auth/register", json={
                         "full_name": "Privilege Escalation Probe",
-                        "email": f"probe-{attempted_role.lower()}-{os.urandom(4).hex()}@example.com",
+                        "email": email,
                         "password": "Probe@12345",
                         "role": attempted_role,
                     })
                     self.assertEqual(response.status_code, 200)
+
+                    # Sign-up itself must not hand out a session - the account is
+                    # inert until the emailed code is entered.
+                    self.assertNotIn(
+                        "access_token", response.json(),
+                        "Registration issued a session before the email was verified",
+                    )
+
+                    token = self._verify_and_get_token(client, email)
                     self.assertEqual(
-                        response.json()["role"], "victim",
+                        token["role"], "victim",
                         f"Registration granted '{attempted_role}' to a public sign-up",
                     )
 
-                    # And the token it issued must be refused by admin endpoints.
-                    token = response.json()["access_token"]
+                    # And the token it eventually issues must be refused by
+                    # admin endpoints.
                     denied = client.get(
                         "/api/admin/stats",
-                        headers={"Authorization": f"Bearer {token}"},
+                        headers={"Authorization": f"Bearer {token['access_token']}"},
                     )
                     self.assertEqual(
                         denied.status_code, 403,
@@ -295,6 +305,203 @@ class TestDigiSafeDirect(unittest.TestCase):
             )
             self.assertEqual(created.status_code, 201)
             self.assertEqual(created.json()["role"], "officer")
+
+    def _pending_code(self, email):
+        """Read the outstanding code straight from the database.
+
+        The suite cannot open a mailbox, so it reads what was stored rather than
+        what was delivered. That is the right seam: delivery is smtplib's
+        responsibility, while the rule under test - that an account stays inert
+        until the correct code is presented - lives in this codebase.
+        """
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.email == email.strip().lower()).first()
+            return user.verification_code if user else None
+        finally:
+            db.close()
+
+    def _verify_and_get_token(self, client, email):
+        code = self._pending_code(email)
+        self.assertIsNotNone(code, f"No verification code was issued for {email}")
+        response = client.post("/api/auth/verify", json={"email": email, "code": code})
+        self.assertEqual(
+            response.status_code, 200,
+            f"Verification failed for {email}: {response.text}",
+        )
+        return response.json()
+
+    def test_04h_account_is_inert_until_the_emailed_code_is_entered(self):
+        """Sign-up must not be enough on its own (Section 3.8.2, authentication).
+
+        Registering with an address you cannot read must not get you in. If it
+        did, anyone could register as a victim they were targeting and be handed
+        that victim's evidence tracking.
+        """
+        from fastapi.testclient import TestClient
+        from main import app
+
+        email = f"verify-{os.urandom(4).hex()}@example.com"
+        password = "Verify@12345"
+
+        with TestClient(app) as client:
+            registered = client.post("/api/auth/register", json={
+                "full_name": "Akosua Verification",
+                "email": email,
+                "password": password,
+                "confirm_password": password,
+            })
+            self.assertEqual(registered.status_code, 200)
+            self.assertTrue(registered.json()["verification_required"])
+
+            # The account exists, and the password is right - and it still
+            # cannot sign in.
+            blocked = client.post("/api/auth/login", json={
+                "email": email, "password": password,
+            })
+            self.assertEqual(
+                blocked.status_code, 403,
+                "An unverified account was allowed to sign in",
+            )
+            self.assertEqual(blocked.headers.get("X-DigiSafe-Reason"), "email-unverified")
+
+            # A wrong code changes nothing.
+            wrong = client.post("/api/auth/verify", json={
+                "email": email, "code": "000000" if self._pending_code(email) != "000000" else "111111",
+            })
+            self.assertEqual(wrong.status_code, 400)
+            self.assertEqual(
+                client.post("/api/auth/login", json={"email": email, "password": password}).status_code,
+                403,
+                "A failed verification attempt still unlocked the account",
+            )
+
+            # The correct code does, and signs the person in as a victim.
+            token = self._verify_and_get_token(client, email)
+            self.assertTrue(token["is_verified"])
+            self.assertEqual(token["role"], "victim")
+
+            # And now the ordinary login works.
+            allowed = client.post("/api/auth/login", json={
+                "email": email, "password": password,
+            })
+            self.assertEqual(allowed.status_code, 200)
+
+    def test_04i_verification_code_is_single_use(self):
+        """A code that has been spent must not work twice.
+
+        An emailed code can be forwarded, screenshotted, or sit in a synced
+        mailbox for years. Once it has done its job it has to stop being a key.
+        """
+        from fastapi.testclient import TestClient
+        from main import app
+
+        email = f"replay-{os.urandom(4).hex()}@example.com"
+        with TestClient(app) as client:
+            client.post("/api/auth/register", json={
+                "full_name": "Replay Probe", "email": email, "password": "Replay@12345",
+            })
+            code = self._pending_code(email)
+            self.assertEqual(
+                client.post("/api/auth/verify", json={"email": email, "code": code}).status_code,
+                200,
+            )
+            replayed = client.post("/api/auth/verify", json={"email": email, "code": code})
+            self.assertNotEqual(
+                replayed.status_code, 200,
+                "A verification code was accepted a second time",
+            )
+
+    def test_04j_verification_link_token_also_works(self):
+        """Tapping the button in the email must complete verification too.
+
+        Typing a code on a phone is the fallback, not the main path.
+        """
+        from fastapi.testclient import TestClient
+        from main import app
+
+        email = f"link-{os.urandom(4).hex()}@example.com"
+        with TestClient(app) as client:
+            client.post("/api/auth/register", json={
+                "full_name": "Link Probe", "email": email, "password": "Linked@12345",
+            })
+
+            db = SessionLocal()
+            try:
+                token_value = db.query(User).filter(User.email == email).first().verification_token
+            finally:
+                db.close()
+            self.assertTrue(token_value, "No verification token was issued")
+
+            verified = client.post("/api/auth/verify-token", json={"token": token_value})
+            self.assertEqual(verified.status_code, 200, verified.text)
+            self.assertTrue(verified.json()["is_verified"])
+
+            # And the link, like the code, is spent.
+            self.assertNotEqual(
+                client.post("/api/auth/verify-token", json={"token": token_value}).status_code,
+                200,
+                "A verification link was accepted a second time",
+            )
+
+    def test_04k_resend_does_not_reveal_who_has_an_account(self):
+        """Asking for a code must not answer 'is this person registered here?'
+
+        For a platform used by abuse victims, that question is exactly what an
+        abuser wants answered, so an unknown address gets the same reply as a
+        real one.
+        """
+        from fastapi.testclient import TestClient
+        from main import app
+
+        with TestClient(app) as client:
+            stranger = client.post("/api/auth/resend-verification", json={
+                "email": f"nobody-{os.urandom(4).hex()}@example.com",
+            })
+            self.assertEqual(
+                stranger.status_code, 200,
+                "An unknown address got a different answer from a registered one",
+            )
+
+    def test_04l_verification_email_carries_the_code_and_the_link(self):
+        """The message itself has to contain what the person needs.
+
+        Rendering is checked directly rather than through delivery: with no SMTP
+        server configured the platform writes the message to storage/outbox
+        instead of sending it, and the content is the part this codebase owns.
+        """
+        from services.email_service import (
+            generate_verification_code,
+            generate_verification_token,
+            send_verification_email,
+            verification_link,
+        )
+
+        code = generate_verification_code()
+        token = generate_verification_token()
+
+        self.assertEqual(len(code), 6, "Verification code should be six digits")
+        self.assertTrue(code.isdigit())
+        self.assertNotEqual(
+            code, generate_verification_code(),
+            "Two consecutive codes were identical - the generator is not random",
+        )
+
+        result = send_verification_email(
+            to_email="outbox-probe@example.com",
+            full_name="Outbox Probe",
+            code=code,
+            token=token,
+        )
+        # No SMTP server in the test environment, so this must report honestly
+        # rather than claiming a delivery that did not happen.
+        self.assertFalse(result["delivered"])
+        self.assertEqual(result["delivery"], "outbox")
+
+        written = pathlib.Path(result["detail"]).read_text(encoding="utf-8", errors="replace")
+        self.assertIn(code, written, "The verification code is missing from the email")
+        self.assertIn(token, written, "The verification link is missing from the email")
+        self.assertIn(verification_link(token).split("?")[0], written)
 
     def test_05_checksum_data_recovery_and_tamper_detection(self):
         """Test Section 4.1.8 Checksum Data Recovery Technique (IT-02)."""

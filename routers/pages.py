@@ -21,6 +21,16 @@ def auth_page(request: Request):
     # real deployment they would be an open door to an administrator account.
     return templates.TemplateResponse(request=request, name="auth.html")
 
+@router.get("/verify")
+def verify_page(request: Request):
+    """Where a new account is confirmed.
+
+    Reached two ways: redirected here straight after sign-up, or by tapping the
+    button in the verification email. The ?token= in the link is read by the
+    browser, so the same page serves both without a second route.
+    """
+    return templates.TemplateResponse(request=request, name="verify.html")
+
 @router.get("/submit")
 def submit_page(request: Request):
     return templates.TemplateResponse(request=request, name="victim_submit.html")

@@ -38,3 +38,29 @@ services:
       # demo still runs; that fallback is NOT safe for real victim data.
       - key: DIGISAFE_AES_KEY
         sync: false
+
+      # --- Email verification (see EMAIL_SETUP.md) ---
+      #
+      # All sync: false, so Render prompts for each value in the dashboard and
+      # none of them are ever written into this repository. Leave them unset and
+      # the platform still runs: verification codes are printed to the service
+      # log instead of being emailed, which is enough to demonstrate the flow
+      # but not enough for real users, who cannot read your logs.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: DigiSafe
+
+      # Pin the public address once the service has a stable URL, e.g.
+      # https://digisafe-knust.onrender.com. Pinning it also means a forged Host
+      # header cannot put another domain into a verification link.
+      - key: APP_BASE_URL
+        sync: false

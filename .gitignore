@@ -10,6 +10,10 @@ storage/evidence_files/*
 !storage/evidence_files/.gitkeep
 storage/reports/*
 !storage/reports/.gitkeep
+# Copies of outgoing verification emails written when no SMTP server is
+# configured. Real addresses and live codes - never commit them.
+storage/outbox/*
+!storage/outbox/.gitkeep
 digisafe.db
 extracted_doc_summary.txt
 chapters_3_and_4.txt

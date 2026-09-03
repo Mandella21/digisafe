@@ -24,26 +24,36 @@ def seed_database():
         print("Seeding default accounts and evidence records...")
 
         # 1. Create Default Users
+        # Seeded accounts are marked verified: they exist to be signed into
+        # during a walkthrough, and nobody can read mail at digisafe.org to
+        # confirm them.
+        verified_now = datetime.utcnow()
         victim = User(
             full_name="Ama Serwaa (Complainant)",
             email="victim@digisafe.org",
             password_hash=hash_password("Victim@123"),
             role="victim",
-            created_at=datetime.utcnow() - timedelta(days=2)
+            created_at=datetime.utcnow() - timedelta(days=2),
+            is_verified=True,
+            verified_at=verified_now
         )
         officer = User(
             full_name="Inspector Kwesi Mensah (Cybercrime Unit)",
             email="officer@police.gov.gh",
             password_hash=hash_password("Officer@123"),
             role="officer",
-            created_at=datetime.utcnow() - timedelta(days=5)
+            created_at=datetime.utcnow() - timedelta(days=5),
+            is_verified=True,
+            verified_at=verified_now
         )
         admin = User(
             full_name="DigiSafe System Administrator",
             email="admin@digisafe.org",
             password_hash=hash_password("Admin@123"),
             role="admin",
-            created_at=datetime.utcnow() - timedelta(days=10)
+            created_at=datetime.utcnow() - timedelta(days=10),
+            is_verified=True,
+            verified_at=verified_now
         )
 
         db.add_all([victim, officer, admin])

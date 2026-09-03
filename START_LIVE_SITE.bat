@@ -33,7 +33,13 @@ if not exist "tools\cloudflared.exe" (
 )
 
 echo  [1/3] Starting the DigiSafe server...
-start "DigiSafe Server" /min cmd /c "python -m uvicorn main:app --host 127.0.0.1 --port 8000 > server.log 2>&1"
+REM Bound to 0.0.0.0, not 127.0.0.1, so the site is reachable two ways at once:
+REM through the public tunnel below, and directly from a phone on the same
+REM Wi-Fi at http://<this-PC-IP>:8000. 127.0.0.1 would allow neither.
+REM
+REM The server window is NOT minimised: with no mail server configured, the
+REM verification codes are printed there, and a minimised window hides them.
+start "DigiSafe Server" cmd /c "python -m uvicorn main:app --host 0.0.0.0 --port 8000"
 
 echo  [2/3] Waiting for the server to come up...
 REM The ML models load at startup, so give it a moment.
@@ -46,6 +52,10 @@ echo   Look for the https://....trycloudflare.com link below.
 echo   That is your public website address - share that one.
 echo.
 echo   Keep this window open. Press Ctrl+C to take the site down.
+echo.
+echo   Verification codes: if you have not set up a mail server
+echo   see EMAIL_SETUP.md - sign-up codes are printed in the
+echo   separate "DigiSafe Server" window, not in this one.
 echo  ==========================================================
 echo.
 

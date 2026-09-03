@@ -1,5 +1,6 @@
 ﻿import io
 import csv
+from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
@@ -160,11 +161,17 @@ def create_staff_account(
             detail="Privileged accounts require a password of at least 8 characters.",
         )
 
+    # An account handed out in person by an administrator has already had its
+    # owner identified; there is no inbox to prove ownership of and no one to
+    # read a code sent to a police address the officer may not control yet.
+    # So staff accounts start verified and can sign in straight away.
     staff = User(
         full_name=payload.full_name.strip(),
         email=email_clean,
         password_hash=hash_password(payload.password),
         role=requested_role,
+        is_verified=True,
+        verified_at=datetime.utcnow(),
     )
     db.add(staff)
     db.commit()

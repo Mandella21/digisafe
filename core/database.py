@@ -30,6 +30,15 @@ def ensure_schema():
         "ml_classifications": {
             "detected_categories": "TEXT",
         },
+        "users": {
+            "is_verified": "BOOLEAN DEFAULT 0",
+            "verification_code": "VARCHAR(10)",
+            "verification_token": "VARCHAR(64)",
+            "verification_sent_at": "DATETIME",
+            "verification_expires_at": "DATETIME",
+            "verification_attempts": "INTEGER DEFAULT 0",
+            "verified_at": "DATETIME",
+        },
     }
 
     inspector = inspect(engine)
@@ -46,3 +55,52 @@ def ensure_schema():
                         text(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
                     )
                     print(f"Schema updated: added {table}.{column}")
+
+    _run_once_migrations()
+
+
+def _run_once_migrations():
+    """Data fix-ups that must happen exactly once in a database's lifetime.
+
+    Column top-ups above are safe to re-evaluate every boot, because "does this
+    column exist" answers itself. A data migration cannot be re-derived that
+    way: re-running one would quietly overwrite whatever has happened since. So
+    each is recorded by name in schema_migrations and skipped ever after.
+
+    On a brand-new database these are no-ops - create_all() has already built
+    every column and no rows exist yet - which is why they can run
+    unconditionally rather than trying to detect an "old" database.
+    """
+    from sqlalchemy import text
+
+    migrations = [
+        (
+            "2026-09-users-grandfather-pre-verification-accounts",
+            # Accounts created before email verification existed were made under
+            # rules that never asked for it. Leaving them at the column default
+            # would lock every one of them out on the next start - including, on
+            # a developer's machine, the account holding real evidence records.
+            "UPDATE users SET is_verified = 1, verified_at = CURRENT_TIMESTAMP "
+            "WHERE is_verified = 0 OR is_verified IS NULL",
+        ),
+    ]
+
+    with engine.begin() as connection:
+        connection.execute(text(
+            "CREATE TABLE IF NOT EXISTS schema_migrations ("
+            "  name VARCHAR(150) PRIMARY KEY,"
+            "  applied_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        ))
+        applied = {
+            row[0] for row in connection.execute(text("SELECT name FROM schema_migrations"))
+        }
+        for name, statement in migrations:
+            if name in applied:
+                continue
+            result = connection.execute(text(statement))
+            connection.execute(
+                text("INSERT INTO schema_migrations (name) VALUES (:name)"),
+                {"name": name},
+            )
+            print(f"Migration applied: {name} ({result.rowcount} row(s) affected)")
