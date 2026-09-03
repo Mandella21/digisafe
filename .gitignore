@@ -30,3 +30,4 @@ tools/cloudflared.exe
 server.log
 _header_check.png
 branded_evidence_report.pdf
+tests/test_digisafe.db

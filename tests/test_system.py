@@ -1,5 +1,19 @@
 ﻿import unittest
 import os
+import pathlib
+
+# Point the application at a SEPARATE database before anything imports
+# core.database, which builds its engine from this value at import time.
+#
+# Without this the suite ran against digisafe.db - the same file the live
+# application uses - so every test run wrote fabricated users and evidence into
+# real data. In a system that holds abuse victims' evidence, a test run must
+# never be able to touch the production database.
+_TEST_DB = pathlib.Path(__file__).resolve().parent / "test_digisafe.db"
+os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB}"
+# Fixtures rely on the demonstration accounts, so enable seeding for the suite.
+os.environ["DIGISAFE_SEED_DEMO"] = "true"
+
 from core.database import SessionLocal, engine, ensure_schema
 from seed_data import seed_database
 from models.base import Base
@@ -27,6 +41,9 @@ class TestDigiSafeDirect(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        # Start from a clean slate so results never depend on a previous run.
+        if _TEST_DB.exists():
+            _TEST_DB.unlink()
         Base.metadata.create_all(bind=engine)
         ensure_schema()
         seed_database()
