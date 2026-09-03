@@ -1,3 +1,26 @@
+# Render Blueprint for DigiSafe.
+#
+# Deploy with: New > Blueprint, point it at this repository. Render reads this
+# file and creates both the web service and the database below.
+
+databases:
+  # PostgreSQL, NOT the SQLite file used in development.
+  #
+  # This is not a preference. A Render web service has an EPHEMERAL filesystem:
+  # everything written to disk is discarded on every redeploy, every restart,
+  # and every wake from the free tier's idle spin-down. A SQLite file there
+  # would take every registered account and every piece of preserved evidence
+  # with it, repeatedly and silently - the exact failure this system exists to
+  # prevent. Persistent disks are a paid add-on; a managed database is free.
+  #
+  # core/database.py reads DATABASE_URL and selects the driver from it, so the
+  # same code runs on SQLite locally and PostgreSQL here with no changes.
+  - name: digisafe-db
+    databaseName: digisafe
+    user: digisafe
+    plan: free
+    region: frankfurt
+
 services:
   - type: web
     name: digisafe-knust
@@ -21,6 +44,13 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.7"
+
+      # Wired automatically from the database above - no copying by hand, and
+      # no connection string living in this file.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: digisafe-db
+          property: connectionString
 
       # Signs the JWTs. Render generates a strong random value on first deploy
       # and keeps it stable afterwards.

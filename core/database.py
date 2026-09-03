@@ -2,10 +2,49 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from core.config import settings
 
-connect_args = {'check_same_thread': False} if 'sqlite' in settings.DATABASE_URL else {}
 
-engine = create_engine(settings.DATABASE_URL, connect_args=connect_args)
+def _normalise_database_url(url: str) -> str:
+    """Make a hosting provider's DATABASE_URL usable by SQLAlchemy.
+
+    Render, Heroku and several others hand out connection strings beginning
+    'postgres://'. SQLAlchemy removed that alias in 1.4 and raises
+    NoSuchModuleError on it, so a deployment that is otherwise correct fails at
+    import with an error naming a dialect nobody wrote. Rewriting it here means
+    the value can be pasted from the dashboard exactly as given.
+
+    The driver is pinned to psycopg (v3) because that is what requirements.txt
+    installs; left unqualified, SQLAlchemy looks for psycopg2 and fails.
+    """
+    if url.startswith("postgres://"):
+        url = "postgresql+psycopg://" + url[len("postgres://"):]
+    elif url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
+
+
+DATABASE_URL = _normalise_database_url(settings.DATABASE_URL)
+IS_SQLITE = DATABASE_URL.startswith("sqlite")
+
+# check_same_thread is a SQLite-only concept, and passing it to any other
+# driver is an immediate connection error.
+connect_args = {"check_same_thread": False} if IS_SQLITE else {}
+
+engine_kwargs = {"connect_args": connect_args}
+if not IS_SQLITE:
+    # Managed Postgres instances drop idle connections, and free tiers are the
+    # most aggressive about it. Without pre-ping the first request after a quiet
+    # period fails on a connection the pool still believes is alive; with it,
+    # that connection is quietly discarded and replaced.
+    engine_kwargs["pool_pre_ping"] = True
+    # Free tiers also cap total connections tightly, so keep the pool small
+    # enough that one web service cannot exhaust it on its own.
+    engine_kwargs["pool_size"] = 5
+    engine_kwargs["max_overflow"] = 5
+    engine_kwargs["pool_recycle"] = 300
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def get_db():
     db = SessionLocal()
@@ -16,28 +55,42 @@ def get_db():
 
 
 def ensure_schema():
-    """Additive, idempotent schema top-up for existing SQLite databases.
+    """Additive, idempotent schema top-up for databases that already exist.
 
     SQLAlchemy's create_all() creates missing TABLES but never adds a column to
     a table that already exists. A developer or examiner running an older
-    digisafe.db would therefore hit "no such column" after pulling an update.
-    This adds any missing nullable columns in place, so an existing database
-    keeps its evidence records instead of having to be deleted and re-seeded.
+    database would therefore hit "no such column" after pulling an update. This
+    adds any missing nullable columns in place, so an existing database keeps
+    its evidence records instead of having to be deleted and rebuilt.
     """
     from sqlalchemy import inspect, text
+
+    # Column types are written per dialect rather than once, because the two
+    # disagree on details that matter here: SQLite has no boolean type and
+    # accepts 0/1, Postgres has a real one and rejects 0; SQLite stores bytes
+    # in a BLOB, Postgres in BYTEA.
+    dialect = "sqlite" if IS_SQLITE else "postgresql"
+    BOOL_FALSE = "BOOLEAN DEFAULT 0" if IS_SQLITE else "BOOLEAN DEFAULT FALSE"
+    BLOB = "BLOB" if IS_SQLITE else "BYTEA"
+    TIMESTAMP = "DATETIME" if IS_SQLITE else "TIMESTAMP"
 
     additive_columns = {
         "ml_classifications": {
             "detected_categories": "TEXT",
         },
         "users": {
-            "is_verified": "BOOLEAN DEFAULT 0",
+            "is_verified": BOOL_FALSE,
             "verification_code": "VARCHAR(10)",
             "verification_token": "VARCHAR(64)",
-            "verification_sent_at": "DATETIME",
-            "verification_expires_at": "DATETIME",
+            "verification_sent_at": TIMESTAMP,
+            "verification_expires_at": TIMESTAMP,
             "verification_attempts": "INTEGER DEFAULT 0",
-            "verified_at": "DATETIME",
+            "verified_at": TIMESTAMP,
+        },
+        "evidence": {
+            "file_data": BLOB,
+            "file_name": "VARCHAR(255)",
+            "file_mime": "VARCHAR(120)",
         },
     }
 
@@ -54,7 +107,7 @@ def ensure_schema():
                     connection.execute(
                         text(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
                     )
-                    print(f"Schema updated: added {table}.{column}")
+                    print(f"Schema updated: added {table}.{column} ({dialect})")
 
     _run_once_migrations()
 
@@ -73,6 +126,9 @@ def _run_once_migrations():
     """
     from sqlalchemy import text
 
+    true_value = "1" if IS_SQLITE else "TRUE"
+    false_value = "0" if IS_SQLITE else "FALSE"
+
     migrations = [
         (
             "2026-09-users-grandfather-pre-verification-accounts",
@@ -80,8 +136,8 @@ def _run_once_migrations():
             # rules that never asked for it. Leaving them at the column default
             # would lock every one of them out on the next start - including, on
             # a developer's machine, the account holding real evidence records.
-            "UPDATE users SET is_verified = 1, verified_at = CURRENT_TIMESTAMP "
-            "WHERE is_verified = 0 OR is_verified IS NULL",
+            f"UPDATE users SET is_verified = {true_value}, verified_at = CURRENT_TIMESTAMP "
+            f"WHERE is_verified = {false_value} OR is_verified IS NULL",
         ),
     ]
 
@@ -89,7 +145,7 @@ def _run_once_migrations():
         connection.execute(text(
             "CREATE TABLE IF NOT EXISTS schema_migrations ("
             "  name VARCHAR(150) PRIMARY KEY,"
-            "  applied_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+            "  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
             ")"
         ))
         applied = {

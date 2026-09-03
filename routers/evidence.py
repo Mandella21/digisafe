@@ -1,8 +1,8 @@
-﻿import os
-import uuid
+import os
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from core.config import settings
@@ -24,6 +24,27 @@ router = APIRouter()
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".pdf", ".txt", ".docx", ".webp"}
 MAX_FILE_SIZE_MB = 10
 
+
+def _has_attachment(evidence: Evidence) -> bool:
+    """True if this record has a file that can actually be produced.
+
+    A legacy record may carry a file_path pointing at a file that no longer
+    exists - the whole reason attachments moved into the database. Claiming an
+    attachment we cannot serve is worse than admitting there is none, so the
+    path counts only when the file is still there.
+    """
+    if evidence.file_data:
+        return True
+    return bool(evidence.file_path and os.path.exists(evidence.file_path))
+
+
+def _attachment_name(evidence: Evidence) -> Optional[str]:
+    if evidence.file_name:
+        return evidence.file_name
+    if evidence.file_path:
+        return os.path.basename(evidence.file_path)
+    return None
+
 @router.post("/submit")
 async def submit_evidence(
     content_type: str = Form("text"),
@@ -43,7 +64,9 @@ async def submit_evidence(
             detail="Evidence content cannot be empty."
         )
 
-    file_path = None
+    file_bytes = None
+    file_name_val = None
+    file_mime_val = None
     file_hash_val = None
 
     if file and file.filename:
@@ -61,12 +84,10 @@ async def submit_evidence(
                 detail=f"File exceeds maximum allowed limit of {MAX_FILE_SIZE_MB}MB."
             )
 
-        unique_name = f"{uuid.uuid4().hex}{ext}"
-        target_path = settings.UPLOAD_DIR / unique_name
-        with open(target_path, "wb") as f_dst:
-            f_dst.write(file_bytes)
-
-        file_path = str(target_path)
+        # Held in the row rather than written to disk - see the note on
+        # Evidence.file_data for why a path cannot be trusted to survive.
+        file_name_val = os.path.basename(file.filename)
+        file_mime_val = file.content_type or "application/octet-stream"
         file_hash_val = generate_file_hash(file_bytes)
 
     # 1. Cryptographic Hashing (SHA-256) of raw content
@@ -90,7 +111,9 @@ async def submit_evidence(
             content_type=content_type,
             content=encrypted_content,
             source_url=source_url,
-            file_path=file_path,
+            file_data=file_bytes,
+            file_name=file_name_val,
+            file_mime=file_mime_val,
             file_hash=file_hash_val,
             submitted_at=datetime.utcnow(),
             status=initial_status
@@ -171,8 +194,8 @@ def get_my_evidence(
             "content_type": r.content_type,
             "content_decrypted": decrypt_content(r.content),
             "source_url": r.source_url,
-            "file_path": r.file_path,
-            "file_name": os.path.basename(r.file_path) if r.file_path else None,
+            "file_name": _attachment_name(r),
+            "file_url": f"/api/evidence/{r.evidence_id}/attachment" if _has_attachment(r) else None,
             "submitted_at": r.submitted_at.strftime("%Y-%m-%d %H:%M:%S") if r.submitted_at else "N/A",
             "status": r.status,
             "hash_value": r.hash_record.hash_value if r.hash_record else "N/A",
@@ -203,8 +226,8 @@ def get_evidence_detail(
         "content_type": evidence.content_type,
         "content_decrypted": decrypt_content(evidence.content),
         "source_url": evidence.source_url,
-        "file_path": evidence.file_path,
-        "file_name": os.path.basename(evidence.file_path) if evidence.file_path else None,
+        "file_name": _attachment_name(evidence),
+        "file_url": f"/api/evidence/{evidence.evidence_id}/attachment" if _has_attachment(evidence) else None,
         "submitted_at": evidence.submitted_at.strftime("%Y-%m-%d %H:%M:%S") if evidence.submitted_at else "N/A",
         "status": evidence.status,
         "hash_record": {
@@ -223,6 +246,51 @@ def get_evidence_detail(
             ),
         }
     }
+
+@router.get("/{evidence_id}/attachment")
+def download_attachment(
+    evidence_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Serve an evidence attachment, to people entitled to see it.
+
+    Attachments used to be reachable through the /storage static mount, which
+    served any file to anyone who could guess its name - no login, no ownership
+    check. These are screenshots of abuse directed at named people, so they are
+    served here instead, behind the same rule as the record itself: the victim
+    who submitted it, or law enforcement and administrators.
+    """
+    evidence = db.query(Evidence).filter(Evidence.evidence_id == evidence_id).first()
+    if not evidence:
+        raise HTTPException(404, "Evidence record not found")
+
+    if current_user.role.lower() == "victim" and evidence.victim_id != current_user.user_id:
+        raise HTTPException(403, "Not authorized to view this evidence record")
+
+    filename = _attachment_name(evidence) or f"evidence-{evidence_id}"
+
+    data = evidence.file_data
+    if data is None and evidence.file_path and os.path.exists(evidence.file_path):
+        # A record captured before attachments moved into the database.
+        with open(evidence.file_path, "rb") as handle:
+            data = handle.read()
+
+    if data is None:
+        raise HTTPException(404, "This record has no retrievable attachment.")
+
+    return Response(
+        content=data,
+        media_type=evidence.file_mime or "application/octet-stream",
+        headers={
+            # attachment, not inline: an uploaded file is untrusted content, and
+            # rendering it in the browser on this origin would let an HTML or
+            # SVG upload run script against a logged-in officer's session.
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
 
 @router.post("/{evidence_id}/verify")
 def verify_evidence_integrity(

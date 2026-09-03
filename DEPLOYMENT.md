@@ -105,6 +105,45 @@ restarts with a new hostname.
 
 ---
 
+## 1c. Why PostgreSQL, not SQLite (read this before deploying)
+
+**A deployed instance must not use the SQLite file.** Render, Cloud Run,
+Hugging Face and every comparable free tier give the running process an
+**ephemeral filesystem**: everything written to disk is discarded on each
+redeploy, each restart, and each wake from idle spin-down. Render's own
+documentation is explicit that filesystem changes, "local SQLite databases"
+included, are lost, and that persistent disks are a paid add-on.
+
+For this system that is not an inconvenience. It would silently delete every
+registered account and every preserved evidence record, on a schedule, from a
+platform whose entire purpose is that such records survive. A demonstration
+could pass and the data be gone by the next morning.
+
+Two things follow, and both are already done in this repository:
+
+**The database is PostgreSQL in deployment.** `render.yaml` declares a free
+Postgres instance and wires `DATABASE_URL` into the web service automatically.
+`core/database.py` selects its driver from that URL, so the same code runs on
+SQLite locally and PostgreSQL in deployment with no changes. It also rewrites
+the `postgres://` prefix Render hands out into the form SQLAlchemy accepts —
+a mismatch that otherwise fails at start-up with an error naming a dialect
+nobody wrote.
+
+**Evidence attachments are stored in the database, not on disk.** An uploaded
+screenshot is held in the `evidence.file_data` column and served through
+`/api/evidence/{id}/attachment`, which checks who is asking. Previously they
+were written to `storage/` and served by a static mount — which meant, on an
+ephemeral disk, a record that still claimed an attachment the server could no
+longer produce.
+
+Generated PDF reports are the exception and need no database column: if one is
+missing, `/api/reports/download/{id}` simply regenerates it from the record.
+
+Locally, nothing changes. With no `DATABASE_URL` set you get `digisafe.db` as
+before.
+
+---
+
 ## 2. Deploy Free to Render.com (Recommended - 5 Minutes)
 
 Render provides free hosting for Python web services with HTTPS enabled out of the box.
@@ -125,6 +164,22 @@ Render provides free hosting for Python web services with HTTPS enabled out of t
    ```
 
 ### Step B: Launch on Render
+
+**Use Blueprint, not "New Web Service".** Blueprint reads `render.yaml` and
+creates the web service *and* the PostgreSQL database together, already wired.
+Creating a web service by hand gives you no database and an ephemeral disk.
+
+1. Sign in at <https://dashboard.render.com>
+2. **New > Blueprint**
+3. Connect the GitHub repository and pick the branch
+4. Render shows what it will create — a web service and `digisafe-db` — and
+   prompts for the values marked `sync: false`. `DATABASE_URL` and `SECRET_KEY`
+   are filled in for you.
+5. Apply. First build takes a few minutes; afterwards deploys are quick.
+
+<details>
+<summary>The older manual route, for reference</summary>
+
 1. Go to [dashboard.render.com](https://dashboard.render.com/) and sign up or log in.
 2. Click **New +** -> **Web Service**.
 3. Connect your GitHub account and select the `digisafe` repository.
@@ -157,6 +212,11 @@ Render provides free hosting for Python web services with HTTPS enabled out of t
    | `PYTHON_VERSION` | `3.12.7` |
    | `SECRET_KEY` | any long random string (signs the JWTs) |
    | `DIGISAFE_AES_KEY` | exactly 32 characters (AES-256 evidence encryption) |
+
+   `DATABASE_URL` is **not** in that list on purpose: deploying via Blueprint
+   creates the PostgreSQL database and wires the connection string in for you.
+   See "Why PostgreSQL, not SQLite" below — this is the single most important
+   thing on this page.
    | `APP_BASE_URL` | your live address, e.g. `https://digisafe-knust.onrender.com` |
    | `SMTP_HOST` | e.g. `smtp.gmail.com` (optional - see below) |
    | `SMTP_PORT` | `587` |
@@ -185,6 +245,8 @@ Render provides free hosting for Python web services with HTTPS enabled out of t
 7. Render builds the service, trains the model, and assigns a live public HTTPS
    URL (e.g. `https://digisafe-knust.onrender.com`). The first build takes
    roughly 3-5 minutes, mostly installing scikit-learn and SciPy.
+
+</details>
 
 ### Known free-tier behaviour (say this before the panel notices it)
 

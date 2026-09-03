@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -6,8 +6,19 @@
     <title>{% block title %}DigiSafe - Digital Safety & Evidence Protection{% endblock %}</title>
 
     <!-- Brand identity -->
+    <!--
+      Icons, widest-support order. The SVG is preferred by every current
+      browser and stays crisp at any density; the .ico and PNGs cover the rest,
+      including the /favicon.ico that browsers fetch from the site root on
+      their own before any of this markup is parsed.
+      Regenerate with: python tools/build_favicons.py
+    -->
+    <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
-    <link rel="apple-touch-icon" href="/static/img/logo-mark.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/img/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/img/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
     <meta name="theme-color" content="#0f172a">
     <meta name="description" content="DigiSafe helps victims of online abuse capture, cryptographically preserve, and document digital evidence of harassment in a legally presentable form.">
 

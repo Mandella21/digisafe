@@ -82,6 +82,12 @@ Then open <http://127.0.0.1:8000>.
 The database is created automatically on first start. The trained models are
 committed, so no training step is needed to run the project.
 
+Locally that database is SQLite (`digisafe.db`). **A deployed instance uses
+PostgreSQL instead** — free hosting tiers give the process an ephemeral disk
+that is wiped on every restart, which would repeatedly delete every account and
+every evidence record. `core/database.py` picks the driver from `DATABASE_URL`,
+so the same code runs on both; see [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ### Signing up, and email verification
 
 A new account is created by signing up on `/auth` and is **inert until the email
@@ -231,8 +237,10 @@ services/                hashing, encryption, ML inference, PDF generation,
                          verification email
 ml_model/                corpus builder, preprocessing, training, saved models
 tools/                   setup_email.py, check_email.py - mail setup & diagnostics
+                         build_favicons.py - regenerates the browser icons
 templates/  static/      Jinja2 templates, CSS, JavaScript
-storage/                 encrypted evidence, generated reports, mail outbox
+storage/                 generated reports, mail outbox (evidence attachments
+                         live in the database - see DEPLOYMENT.md)
 tests/                   unittest suite
 ```
 

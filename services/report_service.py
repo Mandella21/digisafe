@@ -1,4 +1,4 @@
-﻿import os
+import os
 from datetime import datetime, timezone
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
@@ -125,10 +125,13 @@ def generate_evidence_report(evidence: Evidence, victim_name: str, victim_email:
     pdf.ln(4)
 
     # 5. Attachment metadata if present
-    if evidence.file_path:
+    attachment_name = evidence.file_name or (
+        os.path.basename(evidence.file_path) if evidence.file_path else None
+    )
+    if attachment_name:
         pdf.set_font("Helvetica", "B", 9)
         pdf.set_text_color(71, 85, 105)
-        pdf.cell(190, 5, f"Associated File Attachment: {os.path.basename(evidence.file_path)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(190, 5, f"Associated File Attachment: {attachment_name}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         if evidence.file_hash:
             pdf.set_font("Courier", "", 8)
             pdf.cell(190, 4, f"Attachment SHA-256 Checksum: {evidence.file_hash}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)

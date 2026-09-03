@@ -1,6 +1,15 @@
 fastapi>=0.110.0
 uvicorn[standard]>=0.28.0
 sqlalchemy>=2.0.0
+
+# PostgreSQL driver.
+#
+# Needed because SQLite cannot be used on a deployed instance: every free tier
+# this runs on gives the process an ephemeral disk that is wiped on restart,
+# redeploy and idle spin-down, which would silently destroy every account and
+# evidence record. Locally, SQLite is still the default and this goes unused -
+# core/database.py picks the driver from DATABASE_URL.
+psycopg[binary]>=3.1
 pydantic>=2.0.0
 cryptography>=42.0.0
 bcrypt>=4.0.0

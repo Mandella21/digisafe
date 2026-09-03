@@ -1,4 +1,23 @@
-﻿from contextlib import asynccontextmanager
+﻿# Cap the numerical libraries to one thread each, BEFORE anything imports
+# numpy - the value is read once, at import, and ignored afterwards.
+#
+# OpenBLAS allocates per-thread working buffers sized to the CPU count. On a
+# 512 MB instance, or on a machine whose commit limit is already tight, that
+# allocation fails and the process dies with a bare MemoryError during import -
+# nothing to do with the size of the data, and confusing to diagnose. This
+# project's models are small enough that multi-threaded BLAS buys nothing
+# measurable, so the memory is pure cost.
+import os
+
+for _threads_var in (
+    "OPENBLAS_NUM_THREADS",
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+):
+    os.environ.setdefault(_threads_var, "1")
+
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -82,7 +101,18 @@ app.add_middleware(
 
 # Mount Static & Storage Assets
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/storage", StaticFiles(directory="storage"), name="storage")
+# storage/ is deliberately NOT mounted.
+#
+# It previously was, which served every file under it to anyone who could name
+# one - no login, no ownership check. That directory holds victims' evidence
+# attachments, generated forensic reports, and (when no mail server is
+# configured) copies of verification emails containing live sign-up codes.
+# Report filenames follow a predictable pattern, so "unlisted" was never the
+# same as "private".
+#
+# Everything under it is now served through an authenticated endpoint that
+# checks who is asking: attachments via /api/evidence/{id}/attachment, reports
+# via /api/reports/download/{id}.
 
 # Include Routers
 app.include_router(pages.router, tags=["Web Pages"])
