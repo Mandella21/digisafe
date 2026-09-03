@@ -127,6 +127,27 @@ If it fails, the script names the likely cause. The common ones:
 | `getaddrinfo failed` | Typo in `SMTP_HOST`, or the machine is offline. |
 | `timed out` | A firewall or the campus network is blocking outbound SMTP. Try a phone hotspot. |
 | `WRONG_VERSION_NUMBER` | Port 465 needs `SMTP_SSL=true`; port 587 needs `SMTP_STARTTLS=true`. |
+| `certificate verify failed` | Something is intercepting the connection — see below. |
+
+### "certificate verify failed" / `Basic Constraints of CA cert not marked critical`
+
+This is not a password problem, and no password will fix it. An antivirus
+"mail shield" or a campus proxy is terminating the encrypted connection and
+presenting its own certificate in place of the mail provider's, and Python
+correctly refuses it.
+
+Both `setup_email.py` and `check_email.py` now detect this before asking for
+or using a credential, and say so. Three ways past it, easiest first:
+
+1. **Use port 2525.** Scanners routinely intercept 587 and 465 and almost never
+   touch 2525. Brevo offers it — that is why it is the Brevo option in
+   `setup_email.py`.
+2. **Turn off encrypted-mail scanning.** In Avast:
+   *Menu → Settings → Protection → Core Shields → Mail Shield →* untick
+   *"Scan secure connections"*. Other products call it SSL scanning or mail
+   filtering.
+3. **Try another network.** A phone hotspot settles it in a minute — if it
+   works there, the block is on your usual network rather than the machine.
 
 In every failure case the code is still printed to the console and the message
 still saved to `storage/outbox/`, so an account is never stranded mid-signup.

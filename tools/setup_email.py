@@ -19,6 +19,11 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+# One implementation of the connection probe, shared with check_email.py, so
+# the two tools can never disagree about what a given failure means.
+from check_email import probe_connection, INTERCEPTION_ADVICE  # noqa: E402
 
 ENV_PATH = BASE_DIR / ".env"
 LINE = "=" * 68
@@ -28,7 +33,12 @@ PROVIDERS = {
     "1": ("Gmail", "smtp.gmail.com", 587, True, False),
     "2": ("Outlook / Hotmail", "smtp-mail.outlook.com", 587, True, False),
     "3": ("Yahoo Mail", "smtp.mail.yahoo.com", 465, False, True),
-    "4": ("Brevo (Sendinblue)", "smtp-relay.brevo.com", 587, True, False),
+    # Brevo on 2525 rather than its 587. Both are documented and both work,
+    # but antivirus mail shields and campus proxies routinely intercept 587 and
+    # almost never touch 2525 - so this is the option that survives a machine
+    # where the others are broken, which is common enough to be the default
+    # worth offering.
+    "4": ("Brevo (port 2525)", "smtp-relay.brevo.com", 2525, True, False),
 }
 
 GMAIL_HELP = """
@@ -164,6 +174,38 @@ def main() -> int:
 
     print()
     print(f"  Using {name}: {host}:{port}")
+
+    # Check the route before asking for a credential. There is no point making
+    # someone go and generate a 16-character App Password if the connection
+    # cannot be established with any password at all.
+    print()
+    print("  Checking this machine can reach it...")
+    use_ssl_probe = port == 465
+    ok, kind, detail = probe_connection(host, port, use_ssl_probe, not use_ssl_probe)
+    if ok:
+        print("  Reached it, and the certificate is valid.")
+    else:
+        print()
+        print(LINE)
+        if kind == "intercepted":
+            print("  PROBLEM: the encrypted connection is being intercepted.")
+            print()
+            print(INTERCEPTION_ADVICE)
+        elif kind == "blocked":
+            print(f"  PROBLEM: nothing answered at {host}:{port}.")
+            print()
+            print("  This network may be blocking outbound mail. A phone hotspot")
+            print("  is the quickest way to find out.")
+        else:
+            print(f"  PROBLEM: {detail}")
+        print(LINE)
+        print()
+        carry_on = ask("Continue anyway and save these settings? (y/N)", "n")
+        if carry_on.strip().lower() not in ("y", "yes"):
+            print()
+            print("  Stopped - nothing was changed. Fix the connection first,")
+            print("  then run this again.")
+            return 1
 
     if choice == "1":
         print(GMAIL_HELP)

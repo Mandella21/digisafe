@@ -25,6 +25,79 @@ from services import email_service  # noqa: E402
 LINE = "=" * 70
 
 
+def probe_connection(host, port, use_ssl, starttls, timeout=12):
+    """Open the connection and do the TLS handshake, without logging in.
+
+    Separating "can this machine reach a mail server" from "are these
+    credentials right" matters, because the two failures need completely
+    different fixes and their error messages look nothing alike. A blocked port
+    or an intercepted certificate is not something a different password will
+    ever solve, and it is worth knowing before someone goes and generates one.
+
+    Returns (ok, kind, detail) where kind is one of:
+      ok           - reached it, certificate valid
+      intercepted  - something is re-signing the connection (see below)
+      blocked      - no route, refused, or timed out
+      tls          - some other TLS problem
+      smtp         - reached it, but the server misbehaved
+    """
+    import smtplib
+    import ssl
+
+    context = ssl.create_default_context()
+    try:
+        if use_ssl:
+            server = smtplib.SMTP_SSL(host, port, timeout=timeout, context=context)
+        else:
+            server = smtplib.SMTP(host, port, timeout=timeout)
+            server.ehlo()
+            if starttls:
+                server.starttls(context=context)
+        server.ehlo()
+        server.quit()
+        return True, "ok", ""
+    except Exception as exc:
+        reason = f"{type(exc).__name__}: {exc}"
+        lowered = reason.lower()
+
+        # Antivirus "mail shields" and corporate proxies terminate the TLS
+        # session and present a certificate signed by their own CA. Some of
+        # those certificates are malformed by modern standards - most commonly
+        # a CA certificate whose Basic Constraints extension is not marked
+        # critical - and OpenSSL refuses them outright. The give-away is that
+        # the failure is a certificate error against a host whose real
+        # certificate is unimpeachable.
+        if "certificate verify failed" in lowered or "certificate_verify" in lowered:
+            return False, "intercepted", reason
+        if any(k in lowered for k in ("getaddrinfo", "timed out", "refused", "unreachable", "timeout")):
+            return False, "blocked", reason
+        if "ssl" in lowered or "tls" in lowered:
+            return False, "tls", reason
+        return False, "smtp", reason
+
+
+INTERCEPTION_ADVICE = """\
+  Something on this machine or network is intercepting the encrypted
+  connection and presenting its own certificate. This is almost always an
+  antivirus "mail shield" or a campus/corporate proxy scanning outbound mail.
+
+  No password will fix this - the connection is refused before any password is
+  sent. Three ways forward, easiest first:
+
+    1. Use a provider that offers port 2525, which these scanners usually
+       leave alone. Brevo (free, 300 emails/day) does:
+         SMTP_HOST=smtp-relay.brevo.com   SMTP_PORT=2525
+
+    2. Turn off the scanner's encrypted-mail scanning. In Avast:
+         Menu > Settings > Protection > Core Shields
+         > Mail Shield > untick "Scan secure connections"
+       (Other products call it SSL scanning or HTTPS/mail filtering.)
+
+    3. Try a different network - a phone hotspot is the quickest test, and
+       rules the network in or out in about a minute.\
+"""
+
+
 # Each entry maps a fragment of a real SMTP/socket error to what actually needs
 # fixing. The fragments are lowercase; the incoming message is lowercased too.
 DIAGNOSES = [
@@ -143,7 +216,35 @@ def main() -> int:
         return 1
 
     print()
-    print("  Connecting and sending...")
+    print("  Step 1 of 2 - can this machine reach the mail server at all?")
+    ok, kind, detail = probe_connection(
+        settings.SMTP_HOST, settings.SMTP_PORT, settings.SMTP_SSL, settings.SMTP_STARTTLS
+    )
+    if ok:
+        print("    Reached it, and the certificate is valid.")
+    else:
+        print(f"    Could not establish a trusted connection: {detail}")
+        print()
+        print(LINE)
+        if kind == "intercepted":
+            print("  CONNECTION INTERCEPTED")
+            print()
+            print(INTERCEPTION_ADVICE)
+        elif kind == "blocked":
+            print("  CANNOT REACH THE MAIL SERVER")
+            print()
+            print(f"  Nothing answered at {settings.SMTP_HOST}:{settings.SMTP_PORT}.")
+            print("  Check the host and port, and whether this network allows")
+            print("  outbound mail. A phone hotspot is the quickest way to tell.")
+        else:
+            print("  TLS PROBLEM")
+            print()
+            print("  Port 465 needs SMTP_SSL=true; port 587 needs SMTP_STARTTLS=true.")
+        print(LINE)
+        return 1
+
+    print()
+    print("  Step 2 of 2 - signing in and sending...")
 
     code = email_service.generate_verification_code()
     token = email_service.generate_verification_token()
