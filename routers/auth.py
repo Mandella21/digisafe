@@ -11,6 +11,31 @@ router = APIRouter()
 @router.post("/register", response_model=TokenResponse)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     email_clean = payload.email.strip().lower()
+
+    # Server-side validation. The browser checks these too, but a form can be
+    # bypassed entirely - anyone can POST straight to this endpoint - so the
+    # rules have to live here to actually mean anything.
+    if not payload.full_name or not payload.full_name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please enter your full name.",
+        )
+    if "@" not in email_clean or "." not in email_clean.split("@")[-1]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please enter a valid email address.",
+        )
+    if len(payload.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Your password must be at least 8 characters long.",
+        )
+    if payload.confirm_password is not None and payload.password != payload.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Those two passwords are different. Please retype them.",
+        )
+
     existing_user = db.query(User).filter(User.email == email_clean).first()
     if existing_user:
         raise HTTPException(

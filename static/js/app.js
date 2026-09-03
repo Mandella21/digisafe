@@ -112,12 +112,25 @@ if (registerForm) {
         const full_name = document.getElementById("regName").value.trim();
         const email = document.getElementById("regEmail").value.trim();
         const password = document.getElementById("regPassword").value;
+        const confirm = document.getElementById("regPasswordConfirm").value;
         const role = document.getElementById("regRole").value;
+
+        if (password !== confirm) {
+            showToast("Those two passwords are different. Please retype them.", "error");
+            document.getElementById("regPasswordConfirm").focus();
+            return;
+        }
+        if (password.length < 8) {
+            showToast("Please choose a password of at least 8 characters.", "error");
+            document.getElementById("regPassword").focus();
+            return;
+        }
+
         try {
             const res = await fetch("/api/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ full_name, email, password, role })
+                body: JSON.stringify({ full_name, email, password, confirm_password: confirm, role })
             });
             const data = await res.json();
             if (res.ok) {
@@ -185,7 +198,7 @@ async function loadMyEvidence() {
     const emptyAlert = document.getElementById("noEvidenceAlert");
     if (!container) return;
     if (!token) {
-        container.innerHTML = `<div class="col-12 text-center py-5"><p class="text-muted">You are not signed in.</p><button class="btn btn-primary btn-sm" onclick="quickLogin('victim')">Sign In as Demo Victim</button></div>`;
+        container.innerHTML = `<div class="col-12 text-center py-5"><p class="text-muted">You are not signed in.</p><a class="btn btn-primary btn-sm" href="/auth">Sign in or create an account</a></div>`;
         return;
     }
     try {
@@ -464,4 +477,25 @@ async function loadAuditLogs() {
 function escapeHtml(str) {
     if (!str) return "";
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+// Live confirm-password feedback on the registration form.
+const regPwd = document.getElementById("regPassword");
+const regPwdConfirm = document.getElementById("regPasswordConfirm");
+const regPwdMatch = document.getElementById("regPasswordMatch");
+if (regPwd && regPwdConfirm && regPwdMatch) {
+    const checkMatch = () => {
+        if (!regPwdConfirm.value) {
+            regPwdMatch.textContent = "Both entries must match.";
+            regPwdMatch.className = "text-muted";
+        } else if (regPwd.value === regPwdConfirm.value) {
+            regPwdMatch.textContent = "Passwords match.";
+            regPwdMatch.className = "text-success";
+        } else {
+            regPwdMatch.textContent = "Passwords do not match yet.";
+            regPwdMatch.className = "text-danger";
+        }
+    };
+    regPwd.addEventListener("input", checkMatch);
+    regPwdConfirm.addEventListener("input", checkMatch);
 }

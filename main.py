@@ -15,7 +15,11 @@ async def lifespan(app: FastAPI):
     # Startup: Ensure tables & seed data exist
     Base.metadata.create_all(bind=engine)
     ensure_schema()
-    seed_database()
+    if settings.SEED_DEMO_DATA:
+        seed_database()
+        print("Demonstration data seeded (DIGISAFE_SEED_DEMO is on).")
+    else:
+        print("Running with a real, empty database. Users are created by signing up.")
     # Load the trained scikit-learn models once, up front, so the first victim
     # to submit evidence does not pay the model-loading latency (Section 3.10,
     # Performance: submissions must respond within three seconds).

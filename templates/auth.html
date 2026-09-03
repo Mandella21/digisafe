@@ -7,7 +7,12 @@
     <div class="row justify-content-center">
         <div class="col-md-7 col-lg-5">
 
-            <!-- Fast Switch Card for Examiners -->
+            {% if demo_mode %}
+            <!--
+              Shown only when DIGISAFE_SEED_DEMO is on. On a live deployment these
+              buttons would hand any visitor an administrator session, so the
+              server does not render them at all rather than merely hiding them.
+            -->
             <div class="card border-warning shadow-sm mb-4 bg-warning-subtle">
                 <div class="card-body py-3">
                     <div class="d-flex align-items-center gap-2 mb-2">
@@ -28,6 +33,7 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
 
             <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
                 <div class="card-header bg-navy text-white text-center py-4">
@@ -110,9 +116,18 @@
                                     <label class="form-label fw-semibold">Password</label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="bi bi-key"></i></span>
-                                        <input type="password" id="regPassword" class="form-control" placeholder="Choose a secure password" required minlength="6">
+                                        <input type="password" id="regPassword" class="form-control" placeholder="Choose a secure password" required minlength="8" autocomplete="new-password">
                                     </div>
-                                    <small class="text-muted">Minimum 6 characters. Encrypted via bcrypt.</small>
+                                    <small class="text-muted">At least 8 characters. Stored only as a bcrypt hash.</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Confirm Password</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-key-fill"></i></span>
+                                        <input type="password" id="regPasswordConfirm" class="form-control" placeholder="Type your password again" required minlength="8" autocomplete="new-password">
+                                    </div>
+                                    <small id="regPasswordMatch" class="text-muted">Both entries must match.</small>
                                 </div>
 
                                 <div class="mb-4">
