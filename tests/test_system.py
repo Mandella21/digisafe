@@ -503,6 +503,148 @@ class TestDigiSafeDirect(unittest.TestCase):
         self.assertIn(token, written, "The verification link is missing from the email")
         self.assertIn(verification_link(token).split("?")[0], written)
 
+    def test_04m_a_code_only_verifies_the_account_it_was_issued_to(self):
+        """Codes must be bound to one account, not merely be valid codes.
+
+        Two people register within seconds of each other. If either one's code
+        could activate the other's account, the whole mechanism would prove
+        nothing about who controls which inbox.
+        """
+        from fastapi.testclient import TestClient
+        from main import app
+
+        alice = f"alice-{os.urandom(4).hex()}@example.com"
+        bob = f"bob-{os.urandom(4).hex()}@example.com"
+
+        with TestClient(app) as client:
+            for address in (alice, bob):
+                client.post("/api/auth/register", json={
+                    "full_name": "Binding Probe",
+                    "email": address,
+                    "password": "Binding@12345",
+                })
+
+            alice_code = self._pending_code(alice)
+            bob_code = self._pending_code(bob)
+            self.assertNotEqual(alice_code, bob_code)
+
+            crossed = client.post("/api/auth/verify", json={
+                "email": alice, "code": bob_code,
+            })
+            self.assertEqual(
+                crossed.status_code, 400,
+                "One account's verification code activated a different account",
+            )
+
+            # And the emailed link is bound the same way: it verifies the
+            # account it was issued for, never whoever happens to open it.
+            db = SessionLocal()
+            try:
+                bob_token = db.query(User).filter(User.email == bob).first().verification_token
+            finally:
+                db.close()
+
+            followed = client.post("/api/auth/verify-token", json={"token": bob_token})
+            self.assertEqual(followed.status_code, 200)
+            self.assertEqual(
+                followed.json()["email"], bob,
+                "A verification link signed in the wrong account",
+            )
+
+            still_locked = client.post("/api/auth/login", json={
+                "email": alice, "password": "Binding@12345",
+            })
+            self.assertEqual(
+                still_locked.status_code, 403,
+                "Alice was let in after Bob verified his own account",
+            )
+
+    def test_04n_configured_smtp_is_actually_used(self):
+        """With a mail server configured, the message must go to it.
+
+        The unconfigured path (console + storage/outbox) is well covered above,
+        which is exactly the risk: it would be easy for the real branch to be
+        broken and every test still pass. This one drives the code that runs in
+        production, stubbing only the socket conversation itself.
+        """
+        from unittest import mock
+        from core.config import settings
+        from services import email_service
+
+        sent = {}
+
+        def fake_transport(message):
+            sent["to"] = message["To"]
+            sent["from"] = message["From"]
+            sent["subject"] = message["Subject"]
+            sent["body"] = message.get_body(
+                preferencelist=("plain",)
+            ).get_content()
+
+        code = email_service.generate_verification_code()
+        token = email_service.generate_verification_token()
+
+        with mock.patch.object(settings, "SMTP_HOST", "smtp.example.org"), \
+             mock.patch.object(settings, "MAIL_FROM", "digisafe@example.org"), \
+             mock.patch.object(settings, "MAIL_FROM_NAME", "DigiSafe"), \
+             mock.patch.object(email_service, "_send_via_smtp", fake_transport):
+
+            self.assertTrue(
+                email_service.is_smtp_configured(),
+                "Setting SMTP_HOST and MAIL_FROM should count as configured",
+            )
+            result = email_service.send_verification_email(
+                to_email="recipient@yahoo.com",
+                full_name="Kofi Owusu",
+                code=code,
+                token=token,
+            )
+
+        self.assertTrue(result["delivered"], "A successful send reported failure")
+        self.assertEqual(result["delivery"], "smtp")
+        self.assertEqual(sent["to"], "recipient@yahoo.com")
+        self.assertIn("digisafe@example.org", sent["from"])
+        self.assertIn(code, sent["subject"])
+        self.assertIn(code, sent["body"])
+        self.assertIn(token, sent["body"])
+
+    def test_04o_a_failed_send_still_leaves_the_account_recoverable(self):
+        """When the mail server refuses, nothing may be silently lost.
+
+        A registration that already succeeded must not be undone by a mail
+        failure, and the code must remain reachable - otherwise a transient SMTP
+        outage would strand every account created during it.
+        """
+        from unittest import mock
+        from core.config import settings
+        from services import email_service
+
+        def explode(message):
+            raise OSError("Connection unexpectedly closed")
+
+        code = email_service.generate_verification_code()
+
+        with mock.patch.object(settings, "SMTP_HOST", "smtp.example.org"), \
+             mock.patch.object(settings, "MAIL_FROM", "digisafe@example.org"), \
+             mock.patch.object(email_service, "_send_via_smtp", explode):
+            result = email_service.send_verification_email(
+                to_email="unlucky@example.com",
+                full_name="Unlucky Person",
+                code=code,
+                token=email_service.generate_verification_token(),
+            )
+
+        # Reported honestly rather than raised, so the caller can tell the user
+        # what happened instead of returning a 500 over a created account.
+        self.assertFalse(result["delivered"])
+        self.assertEqual(result["delivery"], "failed")
+        self.assertIn("Connection unexpectedly closed", result["detail"])
+
+        # And the message survives on disk, so the code is still recoverable.
+        saved = sorted(pathlib.Path(settings.OUTBOX_DIR).glob("*unlucky*.eml"))
+        self.assertTrue(saved, "A failed send left no copy of the message")
+        self.assertIn(code, saved[-1].read_text(encoding="utf-8", errors="replace"))
+
     def test_05_checksum_data_recovery_and_tamper_detection(self):
         """Test Section 4.1.8 Checksum Data Recovery Technique (IT-02)."""
         ev = self._fixture_evidence()

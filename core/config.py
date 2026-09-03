@@ -3,6 +3,56 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _load_dotenv(path: Path) -> int:
+    """Read KEY=VALUE lines from a .env file into the environment.
+
+    Every secret this project uses is read from the environment, which is the
+    right place for it - but on Windows `set VAR=...` only applies to the one
+    console window you typed it in, so a double-clicked start script or a fresh
+    terminal silently loses the mail credentials and verification quietly falls
+    back to printing codes on screen. A .env file next to main.py survives all
+    of that, and .gitignore already excludes it from the repository.
+
+    Hand-rolled rather than pulling in python-dotenv: the format needed here is
+    a dozen lines of parsing, and one fewer dependency is one fewer thing that
+    can fail to install on the machine this is demonstrated on.
+
+    A real environment variable always wins over the file, so a hosting
+    platform's own settings (Render, Hugging Face) are never overridden by a
+    stray .env that got deployed alongside the code.
+    """
+    if not path.is_file():
+        return 0
+
+    loaded = 0
+    for raw_line in path.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
+        if "=" not in line:
+            continue
+
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+        # Quotes are stripped so a password containing spaces or a trailing '#'
+        # can be written as SMTP_PASSWORD="abcd efgh ijkl mnop".
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("\"", "'"):
+            value = value[1:-1]
+        if key not in os.environ:
+            os.environ[key] = value
+            loaded += 1
+    return loaded
+
+
+DOTENV_PATH = BASE_DIR / ".env"
+DOTENV_LOADED = _load_dotenv(DOTENV_PATH)
+
 class Settings:
     PROJECT_NAME: str = 'DigiSafe Digital Safety & Record Protection'
     VERSION: str = '1.0.0'

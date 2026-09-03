@@ -3,12 +3,40 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from core.config import settings
+from core.config import settings, DOTENV_PATH, DOTENV_LOADED
 from core.database import engine, ensure_schema
 from models.base import Base
 from seed_data import seed_database
-from services import ml_service
+from services import ml_service, email_service
 from routers import auth, evidence, admin, reports, pages
+
+
+def _report_mail_configuration():
+    """Say, at startup, whether verification codes will actually be emailed.
+
+    The difference matters before anyone signs up, not after. Configured, every
+    person who registers gets their own code in their own inbox. Unconfigured,
+    the codes appear only in this console - fine while developing, useless the
+    moment someone registers from their own phone, because they cannot see this
+    window. Printing it here means the answer is known before a demonstration
+    rather than discovered during one.
+    """
+    if DOTENV_LOADED:
+        print(f"Configuration loaded from {DOTENV_PATH.name} ({DOTENV_LOADED} setting(s)).")
+
+    if not settings.REQUIRE_EMAIL_VERIFICATION:
+        print("Email verification is OFF (DIGISAFE_REQUIRE_VERIFICATION). "
+              "Accounts are usable as soon as they are created.")
+        return
+
+    if email_service.is_smtp_configured():
+        print(f"Email verification ON - codes will be sent via {settings.SMTP_HOST} "
+              f"as {settings.MAIL_FROM}.")
+    else:
+        print("Email verification ON, but NO MAIL SERVER is configured.")
+        print("  Verification codes will be printed HERE and saved to storage/outbox/.")
+        print("  Anyone registering from their own device will not be able to see them.")
+        print("  To send real email: copy .env.example to .env, then see EMAIL_SETUP.md.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,6 +48,7 @@ async def lifespan(app: FastAPI):
         print("Demonstration data seeded (DIGISAFE_SEED_DEMO is on).")
     else:
         print("Running with a real, empty database. Users are created by signing up.")
+    _report_mail_configuration()
     # Load the trained scikit-learn models once, up front, so the first victim
     # to submit evidence does not pay the model-loading latency (Section 3.10,
     # Performance: submissions must respond within three seconds).

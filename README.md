@@ -95,12 +95,33 @@ On a platform holding abuse evidence that is not a formality: without it, an
 abuser could register as the person they are targeting and be handed that
 person's own case tracking.
 
-**No mail server is needed to run the project.** With SMTP unconfigured the
-verification code is printed in the server console and the message is saved to
-`storage/outbox/`, and the interface says so rather than telling someone to
-check an inbox nothing was sent to. To send real email, see
-[EMAIL_SETUP.md](EMAIL_SETUP.md) — five environment variables, none of them
-committed.
+#### Getting codes into real inboxes
+
+For other people to sign up — on their own phones, with their own Gmail, Yahoo,
+Outlook or KNUST addresses — DigiSafe needs one mailbox to send *from*:
+
+```bash
+copy .env.example .env      # then fill in the SMTP_ lines
+python tools/check_email.py your.own.address@gmail.com
+```
+
+`check_email.py` sends one real message and says exactly what happened,
+translating SMTP's terse errors into the specific thing to fix. Run it before a
+demonstration rather than discovering a bad password during a live sign-up.
+[EMAIL_SETUP.md](EMAIL_SETUP.md) walks through getting a Gmail App Password.
+
+`.env` is read automatically at startup and is excluded by `.gitignore`, so no
+credential is ever committed — and unlike `set`/`export`, it survives closing
+the terminal and double-clicking a start script.
+
+**The project still runs with none of this.** Unconfigured, the code is printed
+in the server console and the message saved to `storage/outbox/`, and the
+interface says exactly that rather than telling someone to check an inbox
+nothing was sent to. Startup states which mode you are in:
+
+```
+Email verification ON - codes will be sent via smtp.gmail.com as you@gmail.com.
+```
 
 ### Using it from a phone
 
@@ -171,14 +192,23 @@ Deterministic — it reproduces the published metrics exactly.
 python -m unittest discover -s tests -v
 ```
 
-17 tests covering password hashing and JWTs, SHA-256 hashing, AES encryption
+20 tests covering password hashing and JWTs, SHA-256 hashing, AES encryption
 round-trip, ML classification and severity banding, privilege-escalation
 regression (public sign-up cannot self-assign a privileged role), admin-only
-staff provisioning, email verification (an unverified account cannot sign in, a
-code is single-use, the emailed link works, and resend does not reveal who has
-an account), checksum tamper detection, and PDF report generation. The suite
-creates its own fixtures, runs against a separate database file, and works on a
-clean checkout with no database present.
+staff provisioning, email verification, checksum tamper detection, and PDF
+report generation.
+
+The verification tests deserve naming individually, since they are what makes
+the sign-up flow more than decoration: an unverified account cannot sign in
+even with the right password; a code is single-use; the emailed link works and
+is likewise single-use; a code is bound to one account, so one person's code
+cannot activate another's; resend answers identically for an unknown address;
+the message really does carry the code and the link; the SMTP branch that runs
+in production is exercised rather than only its offline fallback; and a failed
+send leaves the account recoverable instead of stranded.
+
+The suite creates its own fixtures, runs against a separate database file, and
+works on a clean checkout with no database present.
 
 ---
 
@@ -194,6 +224,7 @@ routers/                 auth, evidence, admin, reports, pages
 services/                hashing, encryption, ML inference, PDF generation,
                          verification email
 ml_model/                corpus builder, preprocessing, training, saved models
+tools/                   check_email.py - mail delivery diagnostic
 templates/  static/      Jinja2 templates, CSS, JavaScript
 storage/                 encrypted evidence, generated reports, mail outbox
 tests/                   unittest suite
@@ -210,6 +241,8 @@ tests/                   unittest suite
 - **[EMAIL_SETUP.md](EMAIL_SETUP.md)** — pointing the platform at a real mail
   server so verification codes reach people's inboxes, and what to check when
   they do not.
+- **[.env.example](.env.example)** — every setting the platform reads, with an
+  explanation of each. Copy to `.env` and fill in.
 
 ---
 

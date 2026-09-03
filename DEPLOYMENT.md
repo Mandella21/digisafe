@@ -40,8 +40,26 @@ This guide provides step-by-step instructions to run **DigiSafe** locally and de
 
    **No mail server is required to run this.** With SMTP unconfigured the code
    is printed in the terminal running the server, and a copy of the message is
-   written to `storage/outbox/`. To send real email, see
-   [EMAIL_SETUP.md](EMAIL_SETUP.md).
+   written to `storage/outbox/`.
+
+   For other people to sign up with **their own** email addresses — which is the
+   point of the feature — set up sending once:
+
+   ```bash
+   copy .env.example .env
+   ```
+
+   Fill in the `SMTP_` lines (see [EMAIL_SETUP.md](EMAIL_SETUP.md) for how to
+   get a Gmail App Password in about three minutes), then confirm it works
+   before you rely on it:
+
+   ```bash
+   python tools/check_email.py your.own.address@gmail.com
+   ```
+
+   `DELIVERED` means every address anyone types at sign-up — Gmail, Yahoo,
+   Outlook, `@st.knust.edu.gh` — will receive its own code. The server also
+   states which mode it is in on startup, so you never have to guess.
 
 7. *(Optional)* Bring back the pre-configured demonstration accounts:
 
@@ -278,12 +296,16 @@ Access at `http://localhost:8000`.
 
 During your project defense with your supervisor (Prof. Frimpong Twum) and panel:
 0. **Registration & Email Verification (Section 3.8.2)**:
-   - Sign up at `/auth` with a real address, on a phone if you like
+   - Beforehand, run `python tools/check_email.py <your address>` and confirm
+     it says `DELIVERED`, so mail is known to work before anyone is watching
+   - Sign up at `/auth` with a real address, on a phone if you like — ask a
+     panel member for theirs and let the code arrive on their own device
    - Show that `/api/auth/login` refuses the account at this point, *with the
      correct password* — an unverified address is an unowned address
    - Enter the emailed code (or tap the link) and watch the same login succeed
    - Point out that the code is single-use, expires, is compared in constant
-     time, and is cancelled after 8 wrong guesses
+     time, is cancelled after 8 wrong guesses, and is bound to one account, so
+     one person's code cannot activate another's
    - Open `/audit` afterwards to show `USER_REGISTER` and `EMAIL_VERIFIED`
      recorded against the new account
 1. **Victim Workflow**:

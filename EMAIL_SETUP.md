@@ -1,114 +1,152 @@
 # Sending real verification emails
 
-DigiSafe works out of the box with no setup: when no mail server is configured,
-the verification code is **printed in the server console** and a copy of the
-message is saved to `storage/outbox/`. Sign-up, verification and login all work
-that way — nothing is faked, the mail simply is not posted.
+The goal: someone signs up with **their own** address — `@gmail.com`,
+`@yahoo.com`, `@outlook.com`, `@st.knust.edu.gh`, anything — and the 6-digit
+code arrives in **their** inbox, on their phone, exactly the way it does when
+you sign up for any real service. That needs one mailbox for DigiSafe to *send
+from*; recipients can then be any address at all.
 
-To have codes actually arrive in people's inboxes, point the app at a mail
-server. That takes five environment variables and about three minutes.
+This takes about five minutes.
+
+> **Without this step DigiSafe still runs.** Verification codes are printed in
+> the server console and saved to `storage/outbox/`. That is enough to develop
+> against and enough to demonstrate the flow on your own machine — but someone
+> registering from their own phone cannot see your console, so nothing below is
+> optional if other people are going to use the site.
 
 ---
 
 ## Important: nobody should type a password into a chat window
 
-The values below are **secrets**. Set them yourself, on your own machine or in
-your hosting dashboard. Do not paste them into a chat, a screenshot, a commit,
-or a file inside this repository. `.gitignore` already excludes `.env`, and
-nothing in `core/config.py` contains a real credential — every value is read
-from the environment for exactly this reason.
+The values below are **secrets**. Put them in your own `.env` file, on your own
+machine, or in your hosting dashboard. Do not paste them into a chat, a
+screenshot, a commit, or any file that gets committed. `.gitignore` already
+excludes `.env`, and nothing in `core/config.py` contains a real credential —
+every value is read from the environment for exactly this reason.
 
 ---
 
-## Option A — Gmail (easiest for a student project)
+## Step 1 — Get an App Password
 
-Gmail will not accept your normal Google password from an app. You need a
-16-character **App Password**, which is a separate credential you can revoke at
-any time without touching your account password.
+Gmail will not accept your normal Google password from an application. You need
+a 16-character **App Password**: a separate credential, revocable at any time
+without touching your account password.
 
 1. Turn on 2-Step Verification: <https://myaccount.google.com/security>
    (App Passwords do not exist until 2-Step Verification is on.)
 2. Go to <https://myaccount.google.com/apppasswords>
-3. Create one, name it `DigiSafe`, and copy the 16 characters it shows you.
-   It is shown once. If you lose it, delete it and make another.
-4. Use these settings:
-
-| Variable        | Value                                  |
-|-----------------|----------------------------------------|
-| `SMTP_HOST`     | `smtp.gmail.com`                       |
-| `SMTP_PORT`     | `587`                                  |
-| `SMTP_USER`     | your full Gmail address                |
-| `SMTP_PASSWORD` | the 16-character App Password          |
-| `SMTP_STARTTLS` | `true`                                 |
-| `MAIL_FROM`     | your full Gmail address                |
-| `MAIL_FROM_NAME`| `DigiSafe`                             |
+3. Create one, name it `DigiSafe`, and copy the 16 characters.
+   It is shown **once**. If you lose it, delete it and make another.
 
 Gmail's free tier sends roughly 500 messages a day — far more than a project
 demonstration needs.
 
-## Option B — Brevo, Mailjet, SendGrid, Resend
+<details>
+<summary>Not using Gmail?</summary>
 
-Any transactional mail provider works; they all give you a host, a username and
-a key on their free tier. Fill in the same five variables. Providers like these
-are what a real deployment would use, because mail from a proper sending domain
-is far less likely to land in a spam folder than mail from a personal Gmail.
+Any transactional mail provider works — Brevo, Mailjet, SendGrid, Resend — and
+all of them have a free tier that gives you a host, a username and a key. Fill
+in the same fields with their values. This is what a real deployment would use:
+mail from a proper sending domain is far less likely to be filtered into spam
+than mail from a personal Gmail account.
+
+</details>
 
 ---
 
-## Setting the variables
+## Step 2 — Create your `.env` file
 
-### Windows — running locally
+In the project folder, copy the template:
 
-Create a file called `run_with_email.bat` next to `main.py`
-(**do not commit it** — add it to `.gitignore` if you keep it):
+```bash
+copy .env.example .env
+```
 
-```bat
-@echo off
-set SMTP_HOST=smtp.gmail.com
-set SMTP_PORT=587
-set SMTP_USER=your.address@gmail.com
-set SMTP_PASSWORD=your16charapppassword
-set MAIL_FROM=your.address@gmail.com
-set MAIL_FROM_NAME=DigiSafe
+(on macOS or Linux, `cp .env.example .env`)
+
+Open `.env` and fill in the email section:
+
+```ini
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_STARTTLS=true
+SMTP_USER=your.address@gmail.com
+SMTP_PASSWORD="abcd efgh ijkl mnop"
+MAIL_FROM=your.address@gmail.com
+MAIL_FROM_NAME=DigiSafe
+```
+
+The quotes around the password let you paste the App Password with or without
+the spaces Google displays it in.
+
+The server reads `.env` automatically at startup, so this survives closing your
+terminal, rebooting, and double-clicking `START_LIVE_SITE.bat`. That is the
+whole reason to prefer it over typing `set` in a console window — a `set` only
+applies to the one window you typed it in, which is how mail silently stops
+working the next time you start the server.
+
+`.env` is in `.gitignore`. `.env.example` holds no real values and is committed,
+so anyone cloning the project knows what to fill in.
+
+---
+
+## Step 3 — Prove it works, before you need it
+
+```bash
+python tools/check_email.py your.own.address@gmail.com
+```
+
+This sends one real message and tells you exactly what happened. `DELIVERED`
+means sign-up now works for every address anyone types in, on any provider.
+
+Run this *before* a demonstration. Discovering a bad password during a live
+sign-up is discovering it too late.
+
+If it fails, the script names the likely cause. The common ones:
+
+| Message contains | What to fix |
+|---|---|
+| `Application-specific password required` | You used your Google password. Go back to Step 1. |
+| `Username and Password not accepted` | Same cause, or `SMTP_USER` is missing the `@gmail.com` part. |
+| `getaddrinfo failed` | Typo in `SMTP_HOST`, or the machine is offline. |
+| `timed out` | A firewall or the campus network is blocking outbound SMTP. Try a phone hotspot. |
+| `WRONG_VERSION_NUMBER` | Port 465 needs `SMTP_SSL=true`; port 587 needs `SMTP_STARTTLS=true`. |
+
+In every failure case the code is still printed to the console and the message
+still saved to `storage/outbox/`, so an account is never stranded mid-signup.
+
+**Check the spam folder** on the first message. If it landed there, mark it "not
+spam" before your demonstration so later ones reach the inbox. Mail from a
+personal Gmail to an unfamiliar recipient is filtered more aggressively than
+mail from a dedicated sending domain.
+
+---
+
+## Step 4 — Start the server and watch the banner
+
+```bash
 python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-Double-click it to start the server with mail enabled.
+Startup now tells you which mode you are in:
 
-### PowerShell, one session
-
-```powershell
-$env:SMTP_HOST="smtp.gmail.com"; $env:SMTP_PORT="587"; $env:SMTP_USER="your.address@gmail.com"; $env:SMTP_PASSWORD="your16charapppassword"; $env:MAIL_FROM="your.address@gmail.com"
+```
+Email verification ON - codes will be sent via smtp.gmail.com as you@gmail.com.
 ```
 
-### Render (or any host with an Environment tab)
-
-Add each variable in the dashboard under **Environment**. `render.yaml` already
-lists them with `sync: false`, which means Render prompts you for the value and
-never stores it in the repository.
+If it instead says **NO MAIL SERVER is configured**, `.env` is not being read —
+check it is named exactly `.env` (not `.env.txt`, which Windows will hide the
+extension of) and sits beside `main.py`.
 
 ---
 
-## Checking it works
+## Deploying with email
 
-Start the server and register an account with an address you can actually open.
-
-* **Code arrives in the inbox** — done.
-* **Console says `EMAIL NOT SENT — no SMTP server is configured`** — the
-  variables are not reaching the process. On Windows, `set` only applies to the
-  window you typed it in, so start the server from that same window.
-* **Console says `EMAIL DELIVERY FAILED`** — the reason is printed on the next
-  line. The usual causes:
-
-  | Message contains | Meaning |
-  |---|---|
-  | `Username and Password not accepted` | Using your Google password instead of an App Password |
-  | `Application-specific password required` | 2-Step Verification is on but you used the account password |
-  | `getaddrinfo failed` / `timed out` | No internet, or a firewall blocking port 587 |
-  | `SSLError` / `WRONG_VERSION_NUMBER` | Port 465 needs `SMTP_SSL=true` instead of `SMTP_STARTTLS=true` |
-
-  In every failure case the code is still printed to the console and the message
-  is still saved to `storage/outbox/`, so an account is never stranded.
+On Render, Hugging Face or any host with an Environment tab, set the same keys
+there rather than committing a `.env`. `render.yaml` already lists them with
+`sync: false`, which means the platform prompts you for each value and never
+stores it in the repository. A real environment variable always takes precedence
+over `.env`, so a stray file cannot override the host's own settings.
 
 ---
 
@@ -116,7 +154,7 @@ Start the server and register an account with an address you can actually open.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `APP_BASE_URL` | *(unset)* | Address used to build the link inside the email. Leave unset and it is taken from the request, so the link works over a Cloudflare tunnel, on a phone over Wi-Fi, or on localhost without reconfiguration. Set it on a fixed domain — doing so also stops a forged `Host` header from influencing the link. |
+| `APP_BASE_URL` | *(unset)* | Address used to build the link inside the email. Leave unset and it is taken from the request, so the link works over a Cloudflare tunnel, on a phone over Wi-Fi, or on localhost without reconfiguration. Set it on a fixed domain — that also stops a forged `Host` header from influencing the link. |
 | `DIGISAFE_REQUIRE_VERIFICATION` | `true` | Set `false` only for an offline walkthrough. Accounts then become usable the moment they are created. |
 | `VERIFICATION_TTL_MINUTES` | `30` | How long a code stays valid. |
 | `VERIFICATION_RESEND_COOLDOWN` | `60` | Seconds between resends for one account. |
@@ -124,13 +162,14 @@ Start the server and register an account with an address you can actually open.
 
 ---
 
-## What the emails contain
+## Why every email carries both a code and a link
 
-Every verification message carries **both** a 6-digit code and a clickable link,
-and either one completes the process. That is deliberate: a Cloudflare tunnel
-hands out a new address on every restart, and a link generated before a restart
-points at a host that no longer exists. The typed code does not care where the
-site is being served from, so it always works.
+Either one completes verification. That is deliberate: a Cloudflare tunnel hands
+out a new address on every restart, so a link generated before a restart points
+at a host that no longer exists. The typed code does not care where the site is
+being served from, so it always works — and on a phone, `autocomplete="one-time-code"`
+lets iOS and Android offer the code straight from the notification without
+switching apps.
 
 The relevant code lives in [`services/email_service.py`](services/email_service.py)
 and [`routers/auth.py`](routers/auth.py).

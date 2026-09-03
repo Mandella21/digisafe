@@ -133,6 +133,19 @@ if (registerForm) {
             return;
         }
 
+        // Sending a real email takes a second or two. Without this the button
+        // looks dead for that whole time and gets tapped again, which on a slow
+        // phone connection fires a second registration.
+        const regBtn = document.getElementById("regBtn");
+        const regBtnLabel = regBtn ? regBtn.innerHTML : "";
+        if (regBtn) {
+            regBtn.disabled = true;
+            regBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating your account...';
+        }
+        const restoreRegBtn = () => {
+            if (regBtn) { regBtn.disabled = false; regBtn.innerHTML = regBtnLabel; }
+        };
+
         try {
             const res = await fetch("/api/auth/register", {
                 method: "POST",
@@ -149,13 +162,22 @@ if (registerForm) {
                     setTimeout(() => { window.location.href = "/auth"; }, 900);
                     return;
                 }
+                // Deliberately not re-enabled on success: the page is about to
+                // navigate, and a button that springs back to life first invites
+                // a second submission on the way out.
                 sessionStorage.setItem("digisafe_pending_email", data.email);
                 sessionStorage.setItem("digisafe_pending_message", data.message || "");
                 sessionStorage.setItem("digisafe_pending_delivery", data.delivery || "smtp");
                 showToast(data.email_sent ? "Account created - check your email for the code." : "Account created.", "success");
                 setTimeout(() => { window.location.href = "/verify"; }, 700);
-            } else { showToast(data.detail || "Registration failed.", "error"); }
-        } catch (err) { showToast("Error: " + err.message, "error"); }
+            } else {
+                showToast(data.detail || "Registration failed.", "error");
+                restoreRegBtn();
+            }
+        } catch (err) {
+            showToast("Error: " + err.message, "error");
+            restoreRegBtn();
+        }
     });
 }
 
