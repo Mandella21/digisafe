@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="DigiSafe">
+  <title>DigiSafe</title>
+  <!--
+    DigiSafe mark.
+
+    A shield (protection of the victim) enclosing a fingerprint (the evidence
+    itself). The fingerprint is deliberate: "digital fingerprint" is the term
+    the project uses for the SHA-256 hash that makes a record tamper-evident,
+    so the mark states what the system does rather than decorating it.
+
+    Note the ridges are inverted-U shapes with DESCENDING TAILS of uneven
+    length, not concentric circles. Evenly spaced arcs that stop at the
+    horizontal read as a wifi/broadcast icon; the tails and the asymmetry are
+    what make this legible as a fingerprint.
+  -->
+  <defs>
+    <linearGradient id="ds-shield" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#06b6d4"/>
+      <stop offset="55%"  stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Shield body -->
+  <path fill="url(#ds-shield)"
+        d="M16 1.6 L28.4 6.3 C28.8 6.45 29 6.8 29 7.2 V16.4
+           C29 23.3 23.9 28.9 16.4 30.85 A1.6 1.6 0 0 1 15.6 30.85
+           C8.1 28.9 3 23.3 3 16.4 V7.2
+           C3 6.8 3.2 6.45 3.6 6.3 Z"/>
+
+  <!-- Fingerprint ridges -->
+  <g fill="none" stroke="#ffffff" stroke-linecap="round"
+     stroke-width="1.75" stroke-linejoin="round">
+    <!-- outer ridge, long tail left / short right -->
+    <path d="M8.6 24.0 V19.9 A7.4 7.4 0 0 1 23.4 19.9 V22.1" opacity="0.5"/>
+    <!-- middle ridge -->
+    <path d="M11.3 24.8 V19.9 A4.7 4.7 0 0 1 20.7 19.9 V21.9" opacity="0.78"/>
+    <!-- core loop -->
+    <path d="M13.9 25.0 V19.9 A2.1 2.1 0 0 1 18.1 19.9 V23.4"/>
+  </g>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="DigiSafe">
+  <title>DigiSafe</title>
+  <!--
+    Favicon variant. Simplified for 16px: shield runs edge to edge, only two
+    ridges survive, opacity is dropped and strokes are heavier. Detail that
+    reads at 32px turns to mud at 16.
+  -->
+  <defs>
+    <linearGradient id="ds-fav" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#06b6d4"/>
+      <stop offset="55%"  stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+
+  <path fill="url(#ds-fav)"
+        d="M16 0.5 L30.6 6.0 C31.0 6.15 31.2 6.5 31.2 6.9 V17.0
+           C31.2 24.8 25.2 31.2 16.5 31.45 A1.8 1.8 0 0 1 15.5 31.45
+           C6.8 31.2 0.8 24.8 0.8 17.0 V6.9
+           C0.8 6.5 1.0 6.15 1.4 6.0 Z"/>
+
+  <g fill="none" stroke="#ffffff" stroke-linecap="round"
+     stroke-linejoin="round" stroke-width="2.6">
+    <path d="M8.0 25.4 V19.6 A8.0 8.0 0 0 1 24.0 19.6 V22.6"/>
+    <path d="M13.2 26.0 V19.6 A2.8 2.8 0 0 1 18.8 19.6 V24.0"/>
+  </g>
+</svg>

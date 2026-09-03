@@ -6,17 +6,33 @@ from core.config import settings
 from models.evidence import Evidence
 from services.encryption_service import decrypt_content
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOGO_PATH = os.path.join(PROJECT_ROOT, "static", "img", "logo-mark.svg")
+
+
 class DigiSafePDF(FPDF):
     def header(self):
         self.set_fill_color(26, 32, 44)
         self.rect(0, 0, 210, 32, "F")
+
+        # Brand mark, drawn as vector so it stays sharp when the dossier is
+        # printed for a court file. Rendering is wrapped because a missing or
+        # unreadable logo must never be the reason a victim cannot obtain their
+        # evidence report - the header simply falls back to text.
+        text_x = 10
+        try:
+            self.image(str(LOGO_PATH), x=10, y=7, w=18, h=18)
+            text_x = 32
+        except Exception:
+            pass
+
         self.set_text_color(255, 255, 255)
         self.set_font("Helvetica", "B", 16)
-        self.set_xy(10, 8)
-        self.cell(190, 8, "DIGISAFE | DIGITAL SAFETY & RECORD PROTECTION", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="L")
+        self.set_xy(text_x, 8)
+        self.cell(190 - text_x, 8, "DIGISAFE | DIGITAL SAFETY & RECORD PROTECTION", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="L")
         self.set_font("Helvetica", "", 9)
-        self.set_xy(10, 18)
-        self.cell(190, 5, "Forensic Digital Evidence Preservation Platform  *  Republic of Ghana (Act 775 / Act 29)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="L")
+        self.set_xy(text_x, 18)
+        self.cell(190 - text_x, 5, "Forensic Digital Evidence Preservation Platform  *  Republic of Ghana (Act 775 / Act 29)", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="L")
         self.ln(12)
 
     def footer(self):

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 44" role="img" aria-label="DigiSafe">
+  <title>DigiSafe</title>
+  <!--
+    Horizontal lockup: mark plus wordmark, for the navbar and document headers.
+    The shield geometry is copied verbatim from logo-mark.svg; keep the two in
+    step if the mark is ever revised.
+
+    This is the LIGHT-BACKGROUND lockup - "Digi" is a fixed navy, not
+    currentColor. currentColor does not inherit the host page's colour when an
+    SVG is loaded through <img src>, so a currentColor wordmark renders black
+    and disappears on the dark navbar. The navbar therefore inlines
+    logo-mark.svg and keeps its own HTML wordmark; this file is for light
+    surfaces - README, printed report, poster, slides.
+  -->
+  <defs>
+    <linearGradient id="ds-shield-h" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#06b6d4"/>
+      <stop offset="55%"  stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(2 6)">
+    <path fill="url(#ds-shield-h)"
+        d="M16 1.6 L28.4 6.3 C28.8 6.45 29 6.8 29 7.2 V16.4
+           C29 23.3 23.9 28.9 16.4 30.85 A1.6 1.6 0 0 1 15.6 30.85
+           C8.1 28.9 3 23.3 3 16.4 V7.2
+           C3 6.8 3.2 6.45 3.6 6.3 Z"/>
+
+  <!-- Fingerprint ridges -->
+  <g fill="none" stroke="#ffffff" stroke-linecap="round"
+     stroke-width="1.75" stroke-linejoin="round">
+    <!-- outer ridge, long tail left / short right -->
+    <path d="M8.6 24.0 V19.9 A7.4 7.4 0 0 1 23.4 19.9 V22.1" opacity="0.5"/>
+    <!-- middle ridge -->
+    <path d="M11.3 24.8 V19.9 A4.7 4.7 0 0 1 20.7 19.9 V21.9" opacity="0.78"/>
+    <!-- core loop -->
+    <path d="M13.9 25.0 V19.9 A2.1 2.1 0 0 1 18.1 19.9 V23.4"/>
+  </g>
+  </g>
+
+  <text x="41" y="29"
+        font-family="'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif"
+        font-size="22" font-weight="800" letter-spacing="-0.6">
+    <tspan fill="#0f172a">Digi</tspan><tspan fill="#06b6d4">Safe</tspan>
+  </text>
+</svg>
