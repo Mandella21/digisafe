@@ -46,12 +46,13 @@ This guide provides step-by-step instructions to run **DigiSafe** locally and de
    point of the feature — set up sending once:
 
    ```bash
-   copy .env.example .env
+   python tools/setup_email.py
    ```
 
-   Fill in the `SMTP_` lines (see [EMAIL_SETUP.md](EMAIL_SETUP.md) for how to
-   get a Gmail App Password in about three minutes), then confirm it works
-   before you rely on it:
+   It asks which provider you send from, takes the credentials in your own
+   terminal, writes `.env`, and sends a test message straight away. See
+   [EMAIL_SETUP.md](EMAIL_SETUP.md) for how to get a Gmail App Password. To
+   re-test later without changing anything:
 
    ```bash
    python tools/check_email.py your.own.address@gmail.com

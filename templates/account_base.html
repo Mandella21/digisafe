@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DigiSafe{% endblock %}</title>
+
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/img/logo-mark.svg">
+    <meta name="theme-color" content="#1e3a8a">
+    <meta name="description" content="Create a DigiSafe account to capture and cryptographically preserve evidence of online abuse.">
+
+    <!--
+      The account screens deliberately do NOT extend base.html.
+
+      base.html carries the helpline bar, the full navigation and the footer -
+      right for someone browsing the platform, wrong here. A person arriving to
+      create an account has exactly one thing to do, and every extra link is
+      somewhere else to go instead. Stripping the page to a single card is what
+      every sign-up flow worth copying does, and on a phone it is the difference
+      between the form being the screen and the form being below the fold.
+
+      Bootstrap is still loaded, because app.js drives the toasts through it.
+    -->
+    <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/vendor/bootstrap-icons.css">
+    <link rel="stylesheet" href="/static/vendor/fonts.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="account-page">
+
+    <!-- Decorative only: hidden from screen readers, which have no use for it. -->
+    <div class="account-backdrop" aria-hidden="true">
+        <span class="account-orb account-orb-1"></span>
+        <span class="account-orb account-orb-2"></span>
+        <span class="account-orb account-orb-3"></span>
+    </div>
+
+    <main class="account-main">
+
+        <a href="/" class="account-brand">
+            <svg viewBox="0 0 32 32" width="34" height="34" role="img" aria-label="DigiSafe" focusable="false">
+                <defs>
+                    <linearGradient id="dsAcct" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#67e8f9"/>
+                        <stop offset="55%" stop-color="#38bdf8"/>
+                        <stop offset="100%" stop-color="#60a5fa"/>
+                    </linearGradient>
+                </defs>
+                <path fill="url(#dsAcct)"
+                      d="M16 1.6 L28.4 6.3 C28.8 6.45 29 6.8 29 7.2 V16.4
+                         C29 23.3 23.9 28.9 16.4 30.85 A1.6 1.6 0 0 1 15.6 30.85
+                         C8.1 28.9 3 23.3 3 16.4 V7.2
+                         C3 6.8 3.2 6.45 3.6 6.3 Z"/>
+                <g fill="none" stroke="#0f172a" stroke-linecap="round"
+                   stroke-linejoin="round" stroke-width="1.75">
+                    <path d="M8.6 24.0 V19.9 A7.4 7.4 0 0 1 23.4 19.9 V22.1" opacity="0.45"/>
+                    <path d="M11.3 24.8 V19.9 A4.7 4.7 0 0 1 20.7 19.9 V21.9" opacity="0.7"/>
+                    <path d="M13.9 25.0 V19.9 A2.1 2.1 0 0 1 18.1 19.9 V23.4"/>
+                </g>
+            </svg>
+            <span>Digi<span class="account-brand-accent">Safe</span></span>
+        </a>
+
+        <div class="account-card">
+            {% block card %}{% endblock %}
+        </div>
+
+        <p class="account-legal">
+            Protected under the Ghana Data Protection Act 2012 (Act 843).<br>
+            Evidence is encrypted with AES-256 and fingerprinted with SHA-256 on capture.
+        </p>
+
+    </main>
+
+    <!-- app.js writes into this; without it every toast is silently dropped. -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+        <div id="liveToast" class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="toastMessage">Notification</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/vendor/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

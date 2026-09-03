@@ -50,7 +50,7 @@ function checkAuthUI() {
         if (navAdmin) navAdmin.style.display = (user.role === "admin" || user.role === "officer") ? "block" : "none";
         if (navAudit) navAudit.style.display = (user.role === "admin") ? "block" : "none";
     } else {
-        authNav.innerHTML = `<a href="/auth" class="btn btn-outline-light btn-sm px-3"><i class="bi bi-box-arrow-in-right me-1"></i> Sign In / Register</a>`;
+        authNav.innerHTML = `<a href="/auth" class="btn btn-outline-light btn-sm px-3"><i class="bi bi-person-plus me-1"></i> Register / Sign In</a>`;
         if (navAdmin) navAdmin.style.display = "none";
         if (navAudit) navAudit.style.display = "none";
     }
@@ -87,7 +87,11 @@ if (loginForm) {
         e.preventDefault();
         const email = document.getElementById("loginEmail").value.trim();
         const password = document.getElementById("loginPassword").value;
-        const role = document.getElementById("loginRole").value;
+        // Optional: the account screens dropped this control. It never decided
+        // anything - the server answers with the account's real role and the
+        // redirect below uses that - so a page without it behaves identically.
+        const roleField = document.getElementById("loginRole");
+        const role = roleField ? roleField.value : "victim";
         try {
             const res = await fetch("/api/auth/login", {
                 method: "POST",
@@ -120,7 +124,8 @@ if (registerForm) {
         const email = document.getElementById("regEmail").value.trim();
         const password = document.getElementById("regPassword").value;
         const confirm = document.getElementById("regPasswordConfirm").value;
-        const role = document.getElementById("regRole").value;
+        const roleField = document.getElementById("regRole");
+        const role = roleField ? roleField.value : "victim";
 
         if (password !== confirm) {
             showToast("Those two passwords are different. Please retype them.", "error");
@@ -522,16 +527,21 @@ const regPwd = document.getElementById("regPassword");
 const regPwdConfirm = document.getElementById("regPasswordConfirm");
 const regPwdMatch = document.getElementById("regPasswordMatch");
 if (regPwd && regPwdConfirm && regPwdMatch) {
+    // Whatever the markup started with is the resting state - so this works on
+    // the account screens and would still work on a Bootstrap-styled form.
+    const restingText = regPwdMatch.textContent;
+    const setState = (text, state) => {
+        regPwdMatch.textContent = text;
+        regPwdMatch.classList.remove("is-valid", "is-invalid");
+        if (state) regPwdMatch.classList.add(state);
+    };
     const checkMatch = () => {
         if (!regPwdConfirm.value) {
-            regPwdMatch.textContent = "Both entries must match.";
-            regPwdMatch.className = "text-muted";
+            setState(restingText, null);
         } else if (regPwd.value === regPwdConfirm.value) {
-            regPwdMatch.textContent = "Passwords match.";
-            regPwdMatch.className = "text-success";
+            setState("Passwords match.", "is-valid");
         } else {
-            regPwdMatch.textContent = "Passwords do not match yet.";
-            regPwdMatch.className = "text-danger";
+            setState("Passwords do not match yet.", "is-invalid");
         }
     };
     regPwd.addEventListener("input", checkMatch);
@@ -557,9 +567,9 @@ function finishVerification(data) {
     const codeState = document.getElementById("codeVerifyState");
     const tokenState = document.getElementById("tokenVerifyState");
     const doneState = document.getElementById("verifiedState");
-    if (codeState) codeState.classList.add("d-none");
-    if (tokenState) tokenState.classList.add("d-none");
-    if (doneState) doneState.classList.remove("d-none");
+    if (codeState) codeState.hidden = true;
+    if (tokenState) tokenState.hidden = true;
+    if (doneState) doneState.hidden = false;
 
     showToast("Email confirmed. Welcome to DigiSafe, " + (data.full_name || "") + "!", "success");
     setTimeout(() => {
@@ -586,7 +596,7 @@ if (verifyForm) {
 
     const pendingDelivery = sessionStorage.getItem("digisafe_pending_delivery");
     if (consoleNotice && (pendingDelivery === "outbox" || pendingDelivery === "failed")) {
-        consoleNotice.classList.remove("d-none");
+        consoleNotice.hidden = false;
     }
 
     // Digits only, and never more than six - so a code pasted with spaces or a
@@ -648,7 +658,7 @@ if (verifyForm) {
                     showToast(data.message || "A new code is on its way.", "success");
                     if (introText && data.message) introText.textContent = data.message;
                     if (consoleNotice) {
-                        consoleNotice.classList.toggle("d-none", data.delivery === "smtp");
+                        consoleNotice.hidden = data.delivery === "smtp";
                     }
                     // Mirror the server cooldown, so the button cannot be tapped
                     // into a 429 the person did not cause.
@@ -683,8 +693,8 @@ if (verifyForm) {
     // not left sitting in browser history or in a shared screenshot.
     const urlToken = new URLSearchParams(window.location.search).get("token");
     if (urlToken) {
-        document.getElementById("codeVerifyState").classList.add("d-none");
-        document.getElementById("tokenVerifyState").classList.remove("d-none");
+        document.getElementById("codeVerifyState").hidden = true;
+        document.getElementById("tokenVerifyState").hidden = false;
         (async () => {
             try {
                 const res = await fetch("/api/auth/verify-token", {
@@ -697,14 +707,14 @@ if (verifyForm) {
                 if (res.ok) {
                     finishVerification(data);
                 } else {
-                    document.getElementById("tokenVerifyState").classList.add("d-none");
-                    document.getElementById("codeVerifyState").classList.remove("d-none");
+                    document.getElementById("tokenVerifyState").hidden = true;
+                    document.getElementById("codeVerifyState").hidden = false;
                     if (introText) introText.textContent = data.detail || "That link did not work. Enter your code below instead.";
                     showToast(data.detail || "That verification link did not work.", "error");
                 }
             } catch (err) {
-                document.getElementById("tokenVerifyState").classList.add("d-none");
-                document.getElementById("codeVerifyState").classList.remove("d-none");
+                document.getElementById("tokenVerifyState").hidden = true;
+                document.getElementById("codeVerifyState").hidden = false;
                 showToast("Network error: " + err.message, "error");
             }
         })();

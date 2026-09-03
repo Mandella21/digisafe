@@ -101,14 +101,20 @@ For other people to sign up — on their own phones, with their own Gmail, Yahoo
 Outlook or KNUST addresses — DigiSafe needs one mailbox to send *from*:
 
 ```bash
-copy .env.example .env      # then fill in the SMTP_ lines
+python tools/setup_email.py
+```
+
+It asks which provider you use, takes the credentials in your own terminal,
+writes `.env`, and sends a test message so you know it worked. To re-test later
+without changing anything:
+
+```bash
 python tools/check_email.py your.own.address@gmail.com
 ```
 
-`check_email.py` sends one real message and says exactly what happened,
-translating SMTP's terse errors into the specific thing to fix. Run it before a
-demonstration rather than discovering a bad password during a live sign-up.
-[EMAIL_SETUP.md](EMAIL_SETUP.md) walks through getting a Gmail App Password.
+Both translate SMTP's terse errors into the specific thing to fix. Run one
+before a demonstration rather than discovering a bad password during a live
+sign-up. [EMAIL_SETUP.md](EMAIL_SETUP.md) covers getting a Gmail App Password.
 
 `.env` is read automatically at startup and is excluded by `.gitignore`, so no
 credential is ever committed — and unlike `set`/`export`, it survives closing
@@ -224,7 +230,7 @@ routers/                 auth, evidence, admin, reports, pages
 services/                hashing, encryption, ML inference, PDF generation,
                          verification email
 ml_model/                corpus builder, preprocessing, training, saved models
-tools/                   check_email.py - mail delivery diagnostic
+tools/                   setup_email.py, check_email.py - mail setup & diagnostics
 templates/  static/      Jinja2 templates, CSS, JavaScript
 storage/                 encrypted evidence, generated reports, mail outbox
 tests/                   unittest suite

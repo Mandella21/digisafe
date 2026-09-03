@@ -26,6 +26,22 @@ every value is read from the environment for exactly this reason.
 
 ---
 
+## The short version
+
+```bash
+python tools/setup_email.py
+```
+
+It asks which provider you use, takes your address and password (typed into
+your own terminal, never echoed), writes `.env`, and immediately sends a test
+message so you know whether it worked. If that succeeds you are done — skip to
+"Step 4" below and restart the server.
+
+The rest of this page is the same thing done by hand, plus what to do when it
+goes wrong.
+
+---
+
 ## Step 1 — Get an App Password
 
 Gmail will not accept your normal Google password from an application. You need
