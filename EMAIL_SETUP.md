@@ -136,8 +136,33 @@ This is not a password problem, and no password will fix it. An antivirus
 presenting its own certificate in place of the mail provider's, and Python
 correctly refuses it.
 
-Both `setup_email.py` and `check_email.py` now detect this before asking for
-or using a credential, and say so. Three ways past it, easiest first:
+Both `setup_email.py` and `check_email.py` detect this before asking for or
+using a credential, and say so rather than letting it look like a password
+problem.
+
+**This is normally already handled.** `requirements.txt` includes `truststore`,
+which makes DigiSafe verify mail servers against the *operating system's*
+certificate store instead of Python's bundled one. Windows already trusts the
+scanner's certificate — every other program on the machine sends mail fine —
+so deferring to the OS makes it work. If you see this error, first try:
+
+```bash
+pip install truststore
+```
+
+`check_email.py` prints which store is in use, so you can confirm it took
+effect:
+
+```
+Trust store : operating system store
+```
+
+Note the trade-off: where a scanner *is* intercepting, that scanner can read
+the message. That is already true of everything else on the machine, but if you
+would rather refuse intercepted connections outright, set
+`DIGISAFE_SYSTEM_TRUST=false` — mail will then fail rather than be readable.
+
+If it still fails, in order:
 
 1. **Use port 2525.** Scanners routinely intercept 587 and 465 and almost never
    touch 2525. Brevo offers it — that is why it is the Brevo option in

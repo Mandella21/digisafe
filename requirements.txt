@@ -12,6 +12,21 @@ jinja2>=3.1.0
 # Required by fastapi.testclient for the API security tests
 httpx>=0.27.0
 
+# Lets outgoing mail be verified against the OPERATING SYSTEM's certificate
+# store instead of the one bundled inside Python.
+#
+# This is not cosmetic. Antivirus "mail shields" (Avast, ESET, Kaspersky) and
+# campus proxies intercept SMTP over TLS and re-sign it with a CA they have
+# added to the OS trust store. Windows accepts those certificates; Python's
+# bundled verifier is stricter and rejects them, so on such a machine no
+# verification email can leave at all - with an error that looks like a
+# credentials problem but is not.
+#
+# Optional: services/email_service.py falls back to Python's own roots if this
+# is not installed, and DIGISAFE_SYSTEM_TRUST=false refuses interception
+# outright.
+truststore>=0.9.0
+
 # --- Machine Learning (Sections 3.3.6 / 3.12.3) ---
 #
 # These four are PINNED EXACTLY, unlike everything above, because the trained

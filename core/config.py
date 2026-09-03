@@ -103,6 +103,17 @@ class Settings:
     SMTP_SSL: bool = os.getenv('SMTP_SSL', 'false').strip().lower() in ('1', 'true', 'yes', 'on')
     SMTP_TIMEOUT: int = int(os.getenv('SMTP_TIMEOUT', '20') or 20)
 
+    # Verify mail servers against the operating system's certificate store
+    # rather than Python's bundled one. On by default because antivirus mail
+    # shields (Avast, ESET, Kaspersky) and campus proxies re-sign SMTP
+    # connections with a CA the OS trusts and Python does not, which otherwise
+    # stops mail leaving the machine entirely. See build_ssl_context() in
+    # services/email_service.py for the trade-off; set false to refuse any
+    # intercepted connection.
+    USE_SYSTEM_TRUST_STORE: bool = os.getenv(
+        'DIGISAFE_SYSTEM_TRUST', 'true'
+    ).strip().lower() in ('1', 'true', 'yes', 'on')
+
     MAIL_FROM: str = os.getenv('MAIL_FROM', '').strip() or os.getenv('SMTP_USER', '').strip() or 'no-reply@digisafe.local'
     MAIL_FROM_NAME: str = os.getenv('MAIL_FROM_NAME', 'DigiSafe').strip()
 

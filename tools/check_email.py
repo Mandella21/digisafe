@@ -42,9 +42,12 @@ def probe_connection(host, port, use_ssl, starttls, timeout=12):
       smtp         - reached it, but the server misbehaved
     """
     import smtplib
-    import ssl
 
-    context = ssl.create_default_context()
+    from services import email_service
+
+    # The same context the application itself will use, so a probe that passes
+    # cannot be followed by a send that fails on trust.
+    context = email_service.build_ssl_context()
     try:
         if use_ssl:
             server = smtplib.SMTP_SSL(host, port, timeout=timeout, context=context)
@@ -69,6 +72,8 @@ def probe_connection(host, port, use_ssl, starttls, timeout=12):
         # certificate is unimpeachable.
         if "certificate verify failed" in lowered or "certificate_verify" in lowered:
             return False, "intercepted", reason
+        if "unable to get local issuer" in lowered:
+            return False, "intercepted", reason
         if any(k in lowered for k in ("getaddrinfo", "timed out", "refused", "unreachable", "timeout")):
             return False, "blocked", reason
         if "ssl" in lowered or "tls" in lowered:
@@ -82,18 +87,23 @@ INTERCEPTION_ADVICE = """\
   antivirus "mail shield" or a campus/corporate proxy scanning outbound mail.
 
   No password will fix this - the connection is refused before any password is
-  sent. Three ways forward, easiest first:
+  sent. Four ways forward, easiest first:
 
-    1. Use a provider that offers port 2525, which these scanners usually
+    1. Install truststore, which lets DigiSafe verify against the operating
+       system's certificate store instead of Python's bundled one. Windows
+       already trusts the scanner's certificate, so this usually just works:
+         pip install truststore
+
+    2. Use a provider that offers port 2525, which these scanners usually
        leave alone. Brevo (free, 300 emails/day) does:
          SMTP_HOST=smtp-relay.brevo.com   SMTP_PORT=2525
 
-    2. Turn off the scanner's encrypted-mail scanning. In Avast:
+    3. Turn off the scanner's encrypted-mail scanning. In Avast:
          Menu > Settings > Protection > Core Shields
          > Mail Shield > untick "Scan secure connections"
        (Other products call it SSL scanning or HTTPS/mail filtering.)
 
-    3. Try a different network - a phone hotspot is the quickest test, and
+    4. Try a different network - a phone hotspot is the quickest test, and
        rules the network in or out in about a minute.\
 """
 
@@ -196,6 +206,12 @@ def main() -> int:
     else:
         print("  SMTP pass   : (not set)")
     print(f"  Encryption  : {'SSL' if settings.SMTP_SSL else 'STARTTLS' if settings.SMTP_STARTTLS else 'NONE'}")
+    try:
+        import truststore  # noqa: F401
+        trust = "operating system store" if settings.USE_SYSTEM_TRUST_STORE else "Python bundled (system trust disabled)"
+    except ImportError:
+        trust = "Python bundled (truststore not installed)"
+    print(f"  Trust store : {trust}")
     print(f"  From        : {settings.MAIL_FROM_NAME} <{settings.MAIL_FROM}>")
     print(f"  Sending to  : {recipient}")
     print(LINE)

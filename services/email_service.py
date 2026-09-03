@@ -47,6 +47,40 @@ def is_smtp_configured() -> bool:
     return bool(settings.SMTP_HOST and settings.MAIL_FROM)
 
 
+def build_ssl_context() -> "ssl.SSLContext":
+    """The TLS settings used for SMTP.
+
+    Prefers the operating system's own certificate store over the one bundled
+    with Python, for a specific and common reason: antivirus "mail shields" and
+    campus proxies terminate the connection and re-sign it with a CA they have
+    installed into the OS trust store. Windows accepts those certificates;
+    Python's bundled verifier is stricter and rejects them outright - typically
+    with "Basic Constraints of CA cert not marked critical" - so mail fails on a
+    machine where every other program can send it perfectly well.
+
+    Deferring to the OS means trusting whatever the machine's administrator has
+    already chosen to trust, which is both the same decision every other
+    application on it makes, and a decision that is theirs rather than ours.
+    Where a scanner IS intercepting, that scanner can read the message - so it
+    can be turned off with DIGISAFE_SYSTEM_TRUST=false, which falls back to
+    Python's bundled roots and refuses any interception.
+
+    truststore is an optional dependency. Without it, this is exactly the
+    previous behaviour.
+    """
+    if settings.USE_SYSTEM_TRUST_STORE:
+        try:
+            import truststore
+            return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        except ImportError:
+            pass
+        except Exception:
+            # Any trouble building the OS-backed context is not worth failing
+            # over; the standard one may well work.
+            pass
+    return ssl.create_default_context()
+
+
 def resolve_base_url(request_base_url: str = "") -> str:
     """Where the emailed link should point.
 
@@ -93,7 +127,7 @@ def _write_to_outbox(message: EmailMessage, to_email: str) -> Path:
 
 
 def _send_via_smtp(message: EmailMessage) -> None:
-    context = ssl.create_default_context()
+    context = build_ssl_context()
     if settings.SMTP_SSL:
         server = smtplib.SMTP_SSL(
             settings.SMTP_HOST,
