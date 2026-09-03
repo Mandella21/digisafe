@@ -24,3 +24,7 @@ _doc.txt
 # straight from a clone without a training step. They are also rebuilt at
 # deploy time (see render.yaml) so the artefacts always match the installed
 # scikit-learn version.
+
+# Cloudflare tunnel binary (53MB) - downloaded locally, never committed
+tools/cloudflared.exe
+server.log
