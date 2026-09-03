@@ -1,4 +1,4 @@
-﻿fastapi>=0.110.0
+fastapi>=0.110.0
 uvicorn[standard]>=0.28.0
 sqlalchemy>=2.0.0
 pydantic>=2.0.0
@@ -9,11 +9,32 @@ fpdf2>=2.8.0
 python-multipart>=0.0.9
 jinja2>=3.1.0
 
-# Machine Learning text classification (Sections 3.3.6 / 3.12.3)
-scikit-learn>=1.5.0
-nltk>=3.8.1
-joblib>=1.3.0
-numpy>=1.26.0
-
 # Required by fastapi.testclient for the API security tests
 httpx>=0.27.0
+
+# --- Machine Learning (Sections 3.3.6 / 3.12.3) ---
+#
+# These four are PINNED EXACTLY, unlike everything above, because the trained
+# models in ml_model/*.joblib are pickles produced by these versions. joblib
+# artefacts are not guaranteed to load across scikit-learn or numpy releases,
+# so a floating ">=" here would let a future release silently break evidence
+# classification on the next deploy.
+#
+# Pinning is what lets the deployment host simply install and run, instead of
+# retraining to guarantee a version match. That matters on a 512 MB free-tier
+# instance, where fitting the model during the build risks an out-of-memory
+# failure. Retraining is still one command if the corpus changes:
+#
+#     python ml_model/build_dataset.py && python ml_model/train_model.py
+#
+# If you bump any pin below, retrain and re-commit the .joblib files together
+# with the pin, in the same commit.
+scikit-learn==1.9.0
+numpy==2.5.2
+scipy==1.18.1
+joblib==1.6.0
+
+# NLTK is used for tokenisation and Porter stemming only - both are pure
+# Python and need no downloaded corpora, so this stays unpinned and requires
+# no network access at runtime.
+nltk>=3.8.1

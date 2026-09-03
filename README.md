@@ -1,3 +1,22 @@
+---
+title: DigiSafe
+emoji: 🛡️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 8000
+pinned: false
+license: mit
+short_description: Digital safety and evidence protection for online abuse victims
+---
+
+<!--
+  The block above is Hugging Face Spaces configuration. Spaces reads it to know
+  this is a Docker Space and which port the container listens on. GitHub renders
+  it as a small table at the top of the page, which is harmless. Removing it
+  breaks the Hugging Face deployment; see DEPLOYMENT.md.
+-->
+
 # DigiSafe
 
 **Design and Implementation of a Digital Safety and Record Protection System for

@@ -5,17 +5,14 @@ services:
     plan: free
     region: frankfurt
 
-    # The ML models are REBUILT on the deployment host rather than loaded from
-    # the committed .joblib files. joblib artefacts are tied to the exact
-    # scikit-learn/numpy build that produced them, so training here guarantees
-    # the pickle always matches the versions Render actually installed. It also
-    # means a broken model fails the BUILD loudly instead of failing silently at
-    # the first victim's submission.
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-      python ml_model/build_dataset.py
-      python ml_model/train_model.py
+    # Install only - the trained models are committed and loaded as-is.
+    #
+    # An earlier version retrained the classifier here so the pickle would match
+    # the installed scikit-learn. requirements.txt now pins those versions
+    # exactly, which gives the same guarantee without fitting a model on a
+    # 512 MB free instance, where training risks an out-of-memory build failure.
+    # It also cuts the build from minutes to seconds.
+    buildCommand: pip install -r requirements.txt
 
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
 

@@ -111,8 +111,23 @@ def _load_models():
                 f"Run:  python ml_model/build_dataset.py && python ml_model/train_model.py"
             )
 
-        _models["binary"] = joblib.load(BINARY_MODEL_PATH)
-        _models["category"] = joblib.load(CATEGORY_MODEL_PATH)
+        try:
+            _models["binary"] = joblib.load(BINARY_MODEL_PATH)
+            _models["category"] = joblib.load(CATEGORY_MODEL_PATH)
+        except Exception as exc:
+            # Almost always a version drift: the pickles were produced by the
+            # scikit-learn/numpy versions pinned in requirements.txt, and
+            # something installed a different one. Say so plainly, because the
+            # raw pickle error gives no hint about the cause.
+            raise RuntimeError(
+                f"Could not load the trained models ({type(exc).__name__}: {exc}). "
+                "This usually means the installed scikit-learn/numpy differs from "
+                "the versions pinned in requirements.txt that produced the .joblib "
+                "files. Either reinstall the pinned versions, or retrain and "
+                "re-commit the models with:  python ml_model/build_dataset.py && "
+                "python ml_model/train_model.py"
+            ) from exc
+
         _models["loaded"] = True
         logger.info("DigiSafe ML models loaded (%s)", MODEL_VERSION)
 

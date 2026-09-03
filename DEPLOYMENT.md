@@ -72,14 +72,16 @@ Render provides free hosting for Python web services with HTTPS enabled out of t
    - **Runtime**: `Python 3`
    - **Build Command**:
      ```bash
-     pip install -r requirements.txt && python ml_model/build_dataset.py && python ml_model/train_model.py
+     pip install -r requirements.txt
      ```
-     The classifier is retrained on the deployment host rather than loaded from
-     the committed `.joblib` files. A joblib artefact is tied to the exact
-     scikit-learn/numpy build that produced it, so retraining here guarantees
-     the model always matches the versions Render installed — and a broken model
-     fails the *build* loudly instead of failing silently on a victim's first
-     submission. The database is created and seeded automatically at start-up.
+     That is the whole build. The trained models are committed, and
+     `requirements.txt` pins scikit-learn, numpy, scipy and joblib to the exact
+     versions that produced them, so the pickles load as-is.
+
+     Do **not** add a training step here. Fitting the model on a 512 MB free
+     instance risks an out-of-memory build failure, and the version pins already
+     give the guarantee that retraining was there to provide. The database is
+     created and seeded automatically at start-up.
    - **Start Command**:
      ```bash
      uvicorn main:app --host 0.0.0.0 --port $PORT
@@ -115,6 +117,78 @@ Render provides free hosting for Python web services with HTTPS enabled out of t
   and matches the scope in Section 6 of your proposal. A production deployment
   would use Render's managed PostgreSQL plus object storage — worth saying as
   your "future work" answer if asked about scalability.
+
+---
+
+## 2b. Deploy free to Hugging Face Spaces (no credit card, ever)
+
+Use this if Render asks for a card. Hugging Face Spaces is free permanently,
+never asks for payment details, and gives a permanent public HTTPS URL. For a
+machine-learning project it is arguably the more appropriate home anyway, since
+Spaces is where ML demos are normally published.
+
+The repository is already configured for it: the YAML block at the top of
+`README.md` tells Spaces this is a Docker Space listening on port 8000, and the
+`Dockerfile` runs as UID 1000, which Spaces requires.
+
+### Step A: Create the Space
+
+1. Sign up at [huggingface.co/join](https://huggingface.co/join) — email and
+   password only, no card.
+2. Go to [huggingface.co/new-space](https://huggingface.co/new-space).
+3. **Space name**: `digisafe`
+4. **License**: MIT
+5. **Space SDK**: choose **Docker** -> **Blank**
+6. **Hardware**: `CPU basic - 2 vCPU, 16 GB` (the free option)
+7. **Visibility**: Public
+8. Click **Create Space**.
+
+### Step B: Push the code to it
+
+Hugging Face gives you a git URL like
+`https://huggingface.co/spaces/<your-username>/digisafe`. Add it as a second
+remote alongside GitHub and push:
+
+```bash
+git remote add hf https://huggingface.co/spaces/<your-username>/digisafe
+git push hf main
+```
+
+When git asks for a password, use a **Hugging Face access token**, not your
+account password: [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+-> **New token** -> type **Write**. Paste the token as the password.
+
+The Space builds automatically. Watch the **Logs** tab; the first build takes a
+few minutes while it installs scikit-learn and SciPy.
+
+Your site will be live at:
+
+```
+https://<your-username>-digisafe.hf.space
+```
+
+### Step C: Set the encryption key
+
+In the Space, go to **Settings** -> **Variables and secrets** -> **New secret**:
+
+| Name | Value |
+|---|---|
+| `DIGISAFE_AES_KEY` | a 32-character string |
+| `SECRET_KEY` | any long random string |
+
+Add these as **Secrets**, not public Variables. As with any host, never change
+`DIGISAFE_AES_KEY` after evidence has been stored — doing so makes existing
+records permanently undecryptable.
+
+### What to expect on the free tier
+
+- The Space sleeps after about 48 hours of no visitors and wakes on the next
+  request. That is far more forgiving than Render's 15 minutes, but still open
+  the URL a few minutes before you present.
+- Storage is ephemeral, exactly as on Render's free tier: uploaded files, the
+  SQLite database and generated PDFs reset when the Space restarts, and the demo
+  accounts and sample cases are re-seeded automatically at start-up. This is
+  consistent with the prototype scope declared in Section 6 of the proposal.
 
 ---
 
