@@ -105,10 +105,12 @@ Deterministic — it reproduces the published metrics exactly.
 python -m unittest discover -s tests -v
 ```
 
-10 tests covering password hashing and JWTs, SHA-256 hashing, AES encryption
-round-trip, ML classification and severity banding, checksum tamper detection,
-and PDF report generation. The suite creates its own fixtures and runs on a
-clean checkout with no database present.
+12 tests covering password hashing and JWTs, SHA-256 hashing, AES encryption
+round-trip, ML classification and severity banding, privilege-escalation
+regression (public sign-up cannot self-assign a privileged role), admin-only
+staff provisioning, checksum tamper detection, and PDF report generation. The
+suite creates its own fixtures and runs on a clean checkout with no database
+present.
 
 ---
 
