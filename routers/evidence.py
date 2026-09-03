@@ -114,6 +114,7 @@ async def submit_evidence(
             confidence_score=ml_result["confidence_score"],
             threat_level=ml_result["threat_level"],
             model_version=ml_result["model_version"],
+            detected_categories=", ".join(ml_result.get("detected_categories") or []) or None,
             classified_at=datetime.utcnow()
         )
         db.add(classification)
@@ -214,7 +215,12 @@ def get_evidence_detail(
             "label": evidence.classification.label if evidence.classification else "Pending",
             "confidence_score": evidence.classification.confidence_score if evidence.classification else 0.0,
             "threat_level": evidence.classification.threat_level if evidence.classification else "None",
-            "model_version": evidence.classification.model_version if evidence.classification else "v1.0"
+            "model_version": evidence.classification.model_version if evidence.classification else "v2.0-tfidf-nb",
+            "detected_categories": (
+                evidence.classification.detected_categories.split(", ")
+                if evidence.classification and evidence.classification.detected_categories
+                else []
+            ),
         }
     }
 

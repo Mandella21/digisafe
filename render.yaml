@@ -1,11 +1,43 @@
-﻿services:
+services:
   - type: web
-    name: digisafe-app
-    env: python
-    buildCommand: pip install -r requirements.txt && python seed_data.py
+    name: digisafe-knust
+    runtime: python
+    plan: free
+    region: frankfurt
+
+    # The ML models are REBUILT on the deployment host rather than loaded from
+    # the committed .joblib files. joblib artefacts are tied to the exact
+    # scikit-learn/numpy build that produced them, so training here guarantees
+    # the pickle always matches the versions Render actually installed. It also
+    # means a broken model fails the BUILD loudly instead of failing silently at
+    # the first victim's submission.
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python ml_model/build_dataset.py
+      python ml_model/train_model.py
+
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+
+    healthCheckPath: /
+
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+
+      # Signs the JWTs. Render generates a strong random value on first deploy
+      # and keeps it stable afterwards.
       - key: SECRET_KEY
         generateValue: true
+
+      # AES-256 key for evidence-at-rest encryption. Deliberately NOT committed:
+      # set it once in the Render dashboard (Environment tab).
+      #
+      # It must stay CONSTANT across deploys - rotating it makes every evidence
+      # record already in the database undecryptable, which for this system means
+      # permanently destroying a victim's evidence. Use exactly 32 characters.
+      #
+      # If unset, core/config.py falls back to a built-in development key, so the
+      # demo still runs; that fallback is NOT safe for real victim data.
       - key: DIGISAFE_AES_KEY
-        value: DigiSafeSecretEncryptionKey2026!
+        sync: false

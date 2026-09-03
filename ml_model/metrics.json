@@ -1,0 +1,111 @@
+{
+  "model_version": "v2.0-tfidf-nb",
+  "trained_at_utc": "2026-09-03T02:08:44+00:00",
+  "algorithm": "TF-IDF (unigram+bigram) -> Multinomial Naive Bayes -> Platt calibration",
+  "calibration": "CalibratedClassifierCV(method='sigmoid') with StratifiedGroupKFold folds grouped on seed_id. Raw Naive Bayes is over-confident; calibration makes the confidence_score shown to victims and printed in the PDF report meaningful.",
+  "brier_score_full_corpus": 0.0006,
+  "preprocessing": "NLTK RegexpTokenizer + Porter stemmer + stop-word removal (negations retained)",
+  "libraries": {
+    "scikit_learn": "1.9.0",
+    "python": "3.14.3"
+  },
+  "corpus": {
+    "total_samples": 2520,
+    "abusive": 1260,
+    "non_abusive": 1260,
+    "distinct_seed_groups": 154,
+    "tfidf_vocabulary_size": 2072,
+    "provenance": "Curated synthetic corpus authored for this project: hand-written seed messages expanded by template combination. NOT scraped real-world data. Consistent with the 'sample and simulated data' scope declared in Section 6 of the proposal."
+  },
+  "evaluation_protocol": "Train/test split and cross-validation are GROUPED on seed_id, so no surface variant of a test sentence appears in training. Figures below are therefore not inflated by leakage between near-duplicate rows.",
+  "binary_holdout": {
+    "accuracy": 0.9595,
+    "precision_abusive": 0.9335,
+    "recall_abusive": 0.9904,
+    "f1_abusive": 0.9611,
+    "roc_auc": 0.9964,
+    "confusion_matrix": {
+      "true_negative": 283,
+      "false_positive": 22,
+      "false_negative": 3,
+      "true_positive": 309
+    },
+    "test_set_size": 617,
+    "train_set_size": 1903,
+    "held_out_seed_groups": 39
+  },
+  "binary_cross_validation": {
+    "folds": 5,
+    "scheme": "StratifiedGroupKFold grouped on seed_id (uncalibrated base estimator)",
+    "metric": "f1_abusive",
+    "fold_scores": [
+      0.9546,
+      0.9768,
+      0.9881,
+      0.9562,
+      0.9732
+    ],
+    "mean": 0.9698,
+    "std": 0.0127
+  },
+  "category_holdout": {
+    "algorithm": "TF-IDF (unigram+bigram) -> LinearSVC -> Platt calibration",
+    "accuracy": 0.8574,
+    "macro_f1": 0.7857,
+    "per_class": {
+      "Blackmail / Non-Consensual Extortion": {
+        "precision": 0.8674698795180723,
+        "recall": 0.972972972972973,
+        "f1-score": 0.9171974522292994,
+        "support": 74.0
+      },
+      "Cyberstalking / Intimidation": {
+        "precision": 0.44871794871794873,
+        "recall": 0.603448275862069,
+        "f1-score": 0.5147058823529411,
+        "support": 58.0
+      },
+      "Non-Abusive": {
+        "precision": 0.9965870307167235,
+        "recall": 0.9573770491803278,
+        "f1-score": 0.9765886287625418,
+        "support": 305.0
+      },
+      "Physical Violence / Life Threat": {
+        "precision": 0.7590361445783133,
+        "recall": 0.6631578947368421,
+        "f1-score": 0.7078651685393258,
+        "support": 95.0
+      },
+      "Severe Harassment / Defamation / Hate Speech": {
+        "precision": 0.8375,
+        "recall": 0.788235294117647,
+        "f1-score": 0.8121212121212121,
+        "support": 85.0
+      },
+      "accuracy": 0.8573743922204214,
+      "macro avg": {
+        "precision": 0.7818622007062116,
+        "recall": 0.7970382973739717,
+        "f1-score": 0.785695668801064,
+        "support": 617.0
+      },
+      "weighted avg": {
+        "precision": 0.871107601642656,
+        "recall": 0.8573743922204214,
+        "f1-score": 0.862013903493603,
+        "support": 617.0
+      }
+    },
+    "classes": [
+      "Blackmail / Non-Consensual Extortion",
+      "Cyberstalking / Intimidation",
+      "Non-Abusive",
+      "Physical Violence / Life Threat",
+      "Severe Harassment / Defamation / Hate Speech"
+    ],
+    "test_set_size": 617,
+    "known_weakness": "Cyberstalking and Physical Violence are the two categories most often confused, because intimidation phrasing such as 'I will find you' or 'I am coming for you' occurs in both. This is a genuine semantic overlap, not a training defect. services/ml_service.py mitigates it by escalating severity whenever a high-risk category carries meaningful probability mass, rather than trusting only the single top-ranked category."
+  },
+  "honest_caveat": "These figures describe separability on a curated academic corpus. They are NOT a claim of real-world harassment-detection accuracy, which would require evaluation on an independently labelled dataset of genuine messages. Quote them in the report together with this caveat."
+}

@@ -14,3 +14,13 @@ digisafe.db
 extracted_doc_summary.txt
 chapters_3_and_4.txt
 test_here.py
+
+# Working files (not part of the deliverable)
+_doc.txt
+*.zip
+
+# The trained models and their corpus ARE committed on purpose: they are the
+# deliverable for Objective 4, and committing them means the project runs
+# straight from a clone without a training step. They are also rebuilt at
+# deploy time (see render.yaml) so the artefacts always match the installed
+# scikit-learn version.

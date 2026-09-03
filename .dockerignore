@@ -12,3 +12,7 @@ storage/reports/*
 *.docx
 extracted_doc_summary.txt
 chapters_3_and_4.txt
+_doc.txt
+*.zip
+digisafe.db
+tests/

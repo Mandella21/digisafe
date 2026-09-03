@@ -1,138 +1,255 @@
-﻿import re
-from typing import Dict, Any, List
+"""
+DigiSafe - Machine Learning Detection Service
+==============================================
+Sections 3.3.6 and 3.12.3 - Machine Learning Text Classification Module.
 
-STOP_WORDS = {
-    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and",
-    "any", "are", "aren't", "as", "at", "be", "because", "been", "before", "being",
-    "below", "between", "both", "but", "by", "can't", "cannot", "could", "couldn't",
-    "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down", "during",
-    "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't",
-    "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here",
-    "here's", "hers", "herself", "him", "himself", "his", "how", "how's", "i",
-    "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's",
-    "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself",
-    "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other", "ought",
-    "our", "ours", "ourselves", "out", "over", "own", "same", "shan't", "she",
-    "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", "such",
-    "than", "that", "that's", "the", "their", "theirs", "them", "themselves",
-    "then", "there", "there's", "these", "they", "they'd", "they'll", "they're",
-    "they've", "this", "those", "through", "to", "too", "under", "until", "up",
-    "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were",
-    "weren't", "what", "what's", "when", "when's", "where", "where's", "which",
-    "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would",
-    "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours",
-    "yourself", "yourselves"
+Runtime inference wrapper around the two scikit-learn models trained by
+ml_model/train_model.py:
+
+    harassment_classifier.joblib  TF-IDF -> Multinomial Naive Bayes -> Platt
+                                  calibration            (binary: abusive?)
+    category_classifier.joblib    TF-IDF -> LinearSVC -> Platt calibration
+                                  (multiclass: which kind of abuse?)
+
+Both are loaded once, lazily, on first classification and then cached for the
+lifetime of the process, so per-request inference stays well inside the
+three-second submission budget set by the Performance non-functional
+requirement (Section 3.10).
+
+Implements Section 3.12.3 steps 2-8:
+    2. Receive the submitted text evidence.
+    3. Pre-process (lowercase, stop-word removal, NLTK tokenisation/stemming).
+    4. Transform into TF-IDF feature vectors using Scikit-learn.
+    5. Load the pre-trained Scikit-learn classification model.
+    6. Predict the class label and compute the associated confidence score.
+    7. If confidence >= threshold and label is abusive, flag for review.
+    8. Otherwise mark the record as non-abusive.
+
+Severity mapping
+----------------
+Section 3.3.6 requires a severity band (None / Low / Medium / High / Critical)
+in addition to the binary label. Severity is driven primarily by WHAT KIND of
+threat the message is, not by how confident the classifier is that it is
+abusive: a death threat is severe because of what it is, and it would be wrong
+to downgrade it to "Low" merely because the model was less certain.
+
+The mapping is therefore:
+
+  1. The category model gives a probability distribution over abuse types.
+  2. Each category has a baseline severity (violence/blackmail -> Critical,
+     stalking -> High, general harassment -> Medium).
+  3. Severity is taken from the highest-severity category holding at least
+     ESCALATION_MASS of the probability mass - not merely the single top-ranked
+     category. This deliberately guards against the model's known confusion
+     between Cyberstalking and Physical Violence (see metrics.json): a death
+     threat ranked second behind stalking still escalates to Critical.
+  4. The band is lowered by one level when the binary model is only marginally
+     confident the message is abusive at all (below LOW_CONFIDENCE), so
+     borderline cases are not over-reported to law enforcement.
+
+This is documented, auditable policy applied on top of model output - not a
+hidden second classifier. It is stated here because a severity band printed in
+a court-admissible report must be explainable in court.
+"""
+
+import logging
+import threading
+from pathlib import Path
+from typing import Any, Dict
+
+from ml_model.preprocessing import preprocess_text  # noqa: F401  (re-exported)
+
+logger = logging.getLogger(__name__)
+
+MODEL_DIR = Path(__file__).resolve().parent.parent / "ml_model"
+BINARY_MODEL_PATH = MODEL_DIR / "harassment_classifier.joblib"
+CATEGORY_MODEL_PATH = MODEL_DIR / "category_classifier.joblib"
+
+MODEL_VERSION = "v2.0-tfidf-nb"
+
+# Section 3.12.3 step 7: the decision threshold above which an "abusive"
+# prediction is flagged for administrator review.
+ABUSIVE_THRESHOLD = 0.50
+
+# Baseline severity carried by each category of abuse.
+CATEGORY_SEVERITY = {
+    "Physical Violence / Life Threat": "Critical",
+    "Blackmail / Non-Consensual Extortion": "Critical",
+    "Cyberstalking / Intimidation": "High",
+    "Severe Harassment / Defamation / Hate Speech": "Medium",
 }
 
-# Abuse categories with weighted signals for cyberbullying, threats, blackmail, stalking
-THREAT_CATEGORIES = {
-    "Physical Violence / Life Threat": {
-        "weight": 0.45,
-        "patterns": [
-            r"\bkill\s+you\b", r"\bmurder\b", r"\bbeat\s+you\b", r"\bhurt\s+you\b",
-            r"\bslit\b", r"\bshoot\s+you\b", r"\bdestroy\s+you\b", r"\bput\s+you\s+in\s+(a\s+)?grave\b",
-            r"\bbreak\s+your\s+(neck|legs|bones|face)\b", r"\byou\s+will\s+die\b", r"\bwatch\s+your\s+back\b"
-        ]
-    },
-    "Blackmail / Non-Consensual Extortion": {
-        "weight": 0.40,
-        "patterns": [
-            r"\bleak\b", r"\bexpose\s+your\b", r"\bsend\s+your\s+(nude|nudes|photos|videos|pictures)\b",
-            r"\bblackmail\b", r"\bpay\s+me\s+or\b", r"\bpost\s+your\s+pictures\b", r"\bruin\s+your\s+life\b",
-            r"\bpost\s+(it|them)\s+online\b", r"\bshow\s+everyone\b", r"\bshare\s+your\s+private\b"
-        ]
-    },
-    "Cyberstalking / Intimidation": {
-        "weight": 0.35,
-        "patterns": [
-            r"\bi\s+know\s+where\s+you\s+(live|work|stay)\b", r"\bfollowing\s+you\b",
-            r"\bwatching\s+you\b", r"\bcannot\s+hide\b", r"\bcan't\s+hide\b", r"\bfind\s+you\b",
-            r"\btrack\s+you\b", r"\boutside\s+your\b", r"\bnever\s+leave\s+you\s+alone\b"
-        ]
-    },
-    "Severe Harassment / Defamation / Hate Speech": {
-        "weight": 0.30,
-        "patterns": [
-            r"\buseless\s+(idiot|fool|whore|bitch)\b", r"\bwhore\b", r"\bslut\b", r"\bbitch\b",
-            r"\bidiot\b", r"\bscum\b", r"\bdie\b", r"\bdeserve\s+to\s+die\b", r"\bdisgusting\b",
-            r"\blying\s+bitch\b", r"\bworthless\b", r"\bpig\b"
-        ]
-    }
-}
+# A category is allowed to set the severity band if it holds at least this much
+# of the category model's probability mass, even when it is not ranked first.
+ESCALATION_MASS = 0.20
 
-def preprocess_text(text: str) -> List[str]:
-    """Section 3.12.3: Lowercase, remove punctuation, and tokenize."""
-    clean = text.lower()
-    clean = re.sub(r"[^\w\s]", " ", clean)
-    tokens = clean.split()
-    return [t for t in tokens if t not in STOP_WORDS and len(t) > 1]
+# Below this binary confidence the case is treated as borderline and the
+# severity band is reduced by one level.
+LOW_CONFIDENCE = 0.65
+
+_SEVERITY_ORDER = ["None", "Low", "Medium", "High", "Critical"]
+
+_models = {"binary": None, "category": None, "loaded": False}
+_load_lock = threading.Lock()
+
+
+def _load_models():
+    """Load both joblib pipelines once, under a lock (thread-safe)."""
+    if _models["loaded"]:
+        return
+
+    with _load_lock:
+        if _models["loaded"]:
+            return
+
+        import joblib
+
+        missing = [p.name for p in (BINARY_MODEL_PATH, CATEGORY_MODEL_PATH) if not p.exists()]
+        if missing:
+            raise FileNotFoundError(
+                f"Trained model file(s) not found: {', '.join(missing)}. "
+                f"Run:  python ml_model/build_dataset.py && python ml_model/train_model.py"
+            )
+
+        _models["binary"] = joblib.load(BINARY_MODEL_PATH)
+        _models["category"] = joblib.load(CATEGORY_MODEL_PATH)
+        _models["loaded"] = True
+        logger.info("DigiSafe ML models loaded (%s)", MODEL_VERSION)
+
+
+def warmup() -> bool:
+    """Eagerly load the models at application start-up.
+
+    Called from the FastAPI lifespan handler so that the first victim to
+    submit evidence does not absorb the model-loading latency.
+    """
+    try:
+        _load_models()
+        return True
+    except Exception:
+        logger.exception("ML model warm-up failed")
+        return False
+
+
+def _rank(band: str) -> int:
+    return _SEVERITY_ORDER.index(band)
+
+
+def _demote(band: str) -> str:
+    return _SEVERITY_ORDER[max(_rank(band) - 1, 1)]
+
+
+def _severity_from_categories(category_probabilities):
+    """Highest baseline severity among categories holding real probability mass."""
+    band = "Low"
+    for category, probability in category_probabilities.items():
+        if probability < ESCALATION_MASS:
+            continue
+        candidate = CATEGORY_SEVERITY.get(category)
+        if candidate and _rank(candidate) > _rank(band):
+            band = candidate
+    return band
+
 
 def classify_text(text: str) -> Dict[str, Any]:
-    """
-    Section 3.12.3 & 3.3.6:
-    Computes composite threat level score (0.0 to 1.0) and severity classification.
+    """Classify a piece of evidence text.
+
+    Returns the classification contract consumed by routers/evidence.py and
+    services/report_service.py:
+
+        label             "Abusive" | "Non-Abusive"
+        confidence_score  float 0.0-1.0, the model's probability for the
+                          predicted class
+        threat_level      "None" | "Low" | "Medium" | "High" | "Critical"
+        model_version     identifier persisted to the ML_CLASSIFICATION table
+        detected_categories  list of predicted abuse category (empty if clean)
+        risk_summary      human-readable line shown in the UI and PDF report
     """
     if not text or not text.strip():
         return {
             "label": "Non-Abusive",
-            "confidence_score": 0.05,
+            "confidence_score": 0.0,
             "threat_level": "None",
-            "model_version": "v1.0-tfidf-nb",
+            "model_version": MODEL_VERSION,
             "detected_categories": [],
-            "risk_summary": "No text content detected."
+            "risk_summary": "No text content submitted for analysis.",
         }
 
-    lower_text = text.lower()
-    matched_categories = []
-    category_scores = []
+    _load_models()
 
-    for cat_name, cat_data in THREAT_CATEGORIES.items():
-        cat_matches = 0
-        for pattern in cat_data["patterns"]:
-            if re.search(pattern, lower_text):
-                cat_matches += 1
-        if cat_matches > 0:
-            matched_categories.append(cat_name)
-            score_contrib = min(cat_data["weight"] * (1.0 + 0.2 * (cat_matches - 1)), 0.55)
-            category_scores.append(score_contrib)
+    # Steps 3-6: pre-process -> TF-IDF -> predict. The pre-processing and
+    # vectorisation are inside the persisted Pipeline, so they are guaranteed
+    # identical to what was applied during training.
+    abusive_probability = float(_models["binary"].predict_proba([text])[0][1])
+    is_abusive = abusive_probability >= ABUSIVE_THRESHOLD
 
-    # Base lexical score
-    tokens = preprocess_text(text)
-    token_count = len(tokens)
+    if not is_abusive:
+        # Step 8: report confidence in the predicted (non-abusive) class.
+        return {
+            "label": "Non-Abusive",
+            "confidence_score": round(1.0 - abusive_probability, 4),
+            "threat_level": "None",
+            "model_version": MODEL_VERSION,
+            "detected_categories": [],
+            "risk_summary": (
+                "Content analysed by the TF-IDF/Naive Bayes classifier: no abusive, "
+                "threatening, or harassing pattern detected."
+            ),
+        }
 
-    if not category_scores:
-        # Non-abusive text
-        confidence_score = round(max(0.05, min(0.25, 0.05 + 0.01 * min(token_count, 10))), 2)
-        label = "Non-Abusive"
-        threat_level = "None"
-        risk_summary = "Content analyzed: No threatening, abusive, or harassing patterns detected."
+    # Step 7: flagged. Determine which category of abuse this is.
+    category_model = _models["category"]
+    probabilities = category_model.predict_proba([text])[0]
+    category_probabilities = {
+        str(name): float(p) for name, p in zip(category_model.classes_, probabilities)
+    }
+
+    abuse_probabilities = {
+        name: p for name, p in category_probabilities.items() if name != "Non-Abusive"
+    }
+    category = max(abuse_probabilities, key=abuse_probabilities.get)
+    category_confidence = abuse_probabilities[category]
+
+    # Every abuse category holding meaningful probability mass is reported, so a
+    # message that is both a threat and an extortion attempt surfaces as both.
+    detected_categories = [
+        name for name, p in sorted(
+            abuse_probabilities.items(), key=lambda kv: kv[1], reverse=True
+        )
+        if p >= ESCALATION_MASS
+    ] or [category]
+
+    threat_level = _severity_from_categories(abuse_probabilities)
+    if abusive_probability < LOW_CONFIDENCE:
+        threat_level = _demote(threat_level)
+
+    if threat_level == "Critical":
+        summary = (
+            f"CRITICAL THREAT DETECTED: classified as {category} "
+            f"({abusive_probability:.0%} confidence). Immediate review required."
+        )
+    elif threat_level == "High":
+        summary = (
+            f"HIGH SEVERITY ABUSE: classified as {category} "
+            f"({abusive_probability:.0%} confidence). Priority review recommended."
+        )
+    elif threat_level == "Medium":
+        summary = (
+            f"MEDIUM SEVERITY ABUSE: hostile or intimidating language consistent with "
+            f"{category} ({abusive_probability:.0%} confidence)."
+        )
     else:
-        # Composite aggregation
-        raw_score = sum(category_scores)
-        if len(category_scores) > 1:
-            raw_score += 0.15 # escalating multi-category threat bonus
-        composite_score = min(0.99, max(0.52, raw_score))
-        confidence_score = round(composite_score, 2)
-        label = "Abusive"
-
-        if confidence_score >= 0.85:
-            threat_level = "Critical"
-            risk_summary = f"CRITICAL THREAT DETECTED: Imminent safety risks identified across {len(matched_categories)} category(ies)."
-        elif confidence_score >= 0.70:
-            threat_level = "High"
-            risk_summary = f"HIGH SEVERITY ABUSE: Malicious harassment and threat patterns detected."
-        elif confidence_score >= 0.50:
-            threat_level = "Medium"
-            risk_summary = f"MEDIUM SEVERITY ABUSE: Hostile or intimidating language detected."
-        else:
-            threat_level = "Low"
-            risk_summary = "LOW SEVERITY: Disrespectful or mildly hostile language detected."
+        summary = (
+            f"LOW SEVERITY: borderline abusive language detected "
+            f"({abusive_probability:.0%} confidence). Manual review advised."
+        )
 
     return {
-        "label": label,
-        "confidence_score": confidence_score,
+        "label": "Abusive",
+        "confidence_score": round(abusive_probability, 4),
         "threat_level": threat_level,
-        "model_version": "v1.0-tfidf-nb",
-        "detected_categories": matched_categories,
-        "risk_summary": risk_summary
+        "model_version": MODEL_VERSION,
+        "detected_categories": detected_categories,
+        "category_confidence": round(category_confidence, 4),
+        "risk_summary": summary,
     }

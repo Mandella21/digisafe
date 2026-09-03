@@ -4,16 +4,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from core.config import settings
-from core.database import engine
+from core.database import engine, ensure_schema
 from models.base import Base
 from seed_data import seed_database
+from services import ml_service
 from routers import auth, evidence, admin, reports, pages
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Ensure tables & seed data exist
     Base.metadata.create_all(bind=engine)
+    ensure_schema()
     seed_database()
+    # Load the trained scikit-learn models once, up front, so the first victim
+    # to submit evidence does not pay the model-loading latency (Section 3.10,
+    # Performance: submissions must respond within three seconds).
+    if ml_service.warmup():
+        print(f"ML classifier ready ({ml_service.MODEL_VERSION}).")
+    else:
+        print("WARNING: ML models failed to load. Run: python ml_model/train_model.py")
     yield
 
 app = FastAPI(

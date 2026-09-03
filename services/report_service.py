@@ -137,13 +137,36 @@ def generate_evidence_report(evidence: Evidence, victim_name: str, victim_email:
     pdf.set_text_color(185, 28, 28) if label == "Abusive" else pdf.set_text_color(21, 128, 61)
     pdf.cell(60, 5, f"Classification: {label.upper()}", new_x=XPos.RIGHT, new_y=YPos.TOP)
     pdf.cell(60, 5, f"Threat Severity: {threat_level.upper()}", new_x=XPos.RIGHT, new_y=YPos.TOP)
-    pdf.cell(60, 5, f"Confidence Score: {score * 100:.1f}%", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(60, 5, f"Confidence in Classification: {score * 100:.1f}%", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
+    categories = (classification.detected_categories if classification else None) or "None detected"
     pdf.set_xy(14, pdf.get_y())
     pdf.set_font("Helvetica", "", 8)
     pdf.set_text_color(71, 85, 105)
-    pdf.cell(180, 5, f"Model: Scikit-learn TF-IDF Harassment Classifier ({classification.model_version if classification else 'v1.0'})", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.ln(8)
+    pdf.cell(180, 5, f"Detected Category: {categories}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    pdf.set_xy(14, pdf.get_y())
+    pdf.cell(
+        180, 5,
+        f"Model: Scikit-learn TF-IDF + Naive Bayes classifier ({classification.model_version if classification else 'v2.0-tfidf-nb'})",
+        new_x=XPos.LMARGIN, new_y=YPos.NEXT,
+    )
+    pdf.ln(4)
+
+    # Evidential honesty: a machine classification is decision-support, not proof.
+    # Stating its limits on the face of the report is what makes the report safe
+    # to place before a court (Section 3.10, Integrity).
+    pdf.set_xy(10, pdf.get_y())
+    pdf.set_font("Helvetica", "I", 7)
+    pdf.set_text_color(100, 116, 139)
+    pdf.multi_cell(190, 3.5,
+        "Note on the automated classification: the severity above is produced by a statistical "
+        "text-classification model and is provided as investigative decision-support only. It is "
+        "an indication, not a finding of fact, and does not constitute expert opinion evidence. "
+        "The cryptographic integrity guarantee set out below is independent of it and is unaffected "
+        "by the accuracy of any classification."
+    )
+    pdf.ln(6)
 
     # 7. Chain of Custody & Law Enforcement Sign-off Block
     pdf.set_font("Helvetica", "B", 9)
