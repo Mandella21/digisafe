@@ -252,6 +252,8 @@ tests/                   unittest suite
   evaluation methodology, measured results, and stated limitations.
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** — local setup, Render deployment, Docker,
   and the demonstration checklist.
+- **[DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md)** — every step and every setting
+  needed to put this online, in order.
 - **[EMAIL_SETUP.md](EMAIL_SETUP.md)** — pointing the platform at a real mail
   server so verification codes reach people's inboxes, and what to check when
   they do not.
