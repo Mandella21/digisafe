@@ -333,28 +333,34 @@ Your site will be live at:
 https://<your-username>-digisafe.hf.space
 ```
 
-### Step C: Set the encryption key
+### Step C: Set the secrets
 
-In the Space, go to **Settings** -> **Variables and secrets** -> **New secret**:
+In the Space, go to **Settings** -> **Variables and secrets** -> **New secret**.
+Add all of these as **Secrets**, not public Variables:
 
 | Name | Value |
 |---|---|
-| `DIGISAFE_AES_KEY` | a 32-character string |
+| `DATABASE_URL` | your Neon connection string (see section 1c) |
 | `SECRET_KEY` | any long random string |
+| `DIGISAFE_AES_KEY` | exactly 32 characters |
+| `DIGISAFE_REQUIRE_VERIFICATION` | `false`, until email is configured |
 
-Add these as **Secrets**, not public Variables. As with any host, never change
-`DIGISAFE_AES_KEY` after evidence has been stored — doing so makes existing
-records permanently undecryptable.
+`DATABASE_URL` matters here for the same reason it does on Render: a Space's
+filesystem is ephemeral, so without it the application falls back to a SQLite
+file that is destroyed every time the Space restarts, taking every account and
+every evidence record with it.
+
+Never change `DIGISAFE_AES_KEY` once evidence has been stored — doing so makes
+existing records permanently undecryptable.
 
 ### What to expect on the free tier
 
 - The Space sleeps after about 48 hours of no visitors and wakes on the next
   request. That is far more forgiving than Render's 15 minutes, but still open
   the URL a few minutes before you present.
-- Storage is ephemeral, exactly as on Render's free tier: uploaded files, the
-  SQLite database and generated PDFs reset when the Space restarts, and the demo
-  accounts and sample cases are re-seeded automatically at start-up. This is
-  consistent with the prototype scope declared in Section 6 of the proposal.
+- The container's own filesystem is ephemeral, but with `DATABASE_URL` set that
+  no longer matters: accounts, evidence and attachments live in Postgres, and a
+  missing PDF report is regenerated on demand from the record.
 
 ---
 
