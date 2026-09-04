@@ -23,16 +23,12 @@ Keep that tab open — you need the string in section C.
 
 ## Choosing a host
 
-All three below run this app and need no credit card. Pick one.
-
-| Host | Card | Notes |
+| Host | Free for this app? | Notes |
 |---|---|---|
-| **Hugging Face Spaces** | never | Already configured — `Dockerfile` + the YAML block in `README.md`. Sleeps after ~48h idle. Best fit for an ML project. |
-| **Vercel** | Hobby needs none | Configured — `vercel.json` + `api/index.py`. Python functions get a 500 MB bundle limit and this app is 245 MB. Serverless, so a cold start reloads scikit-learn; expect the first request after idle to be slow. |
-| **Render** | web service no, its Postgres yes | Configured — `render.yaml`. Use Neon for the database and no card is needed. Sleeps after 15 min idle. |
-
-**Firebase cannot host this.** App Hosting supports Next.js and Angular, not
-Python, and requires the Blaze plan — a credit card — regardless.
+| **Render + Neon** | **Yes** | **Recommended.** Configured in `render.yaml`. The web service needs no card; use Neon for the database, which also needs none. A long-running process, so the models load once and stay loaded. 512 MB RAM, sleeps after 15 min idle. |
+| **Vercel** | **Yes** | Configured in `vercel.json` + `api/index.py`. Hobby needs no card, 2 GB memory, and Python functions get a 500 MB bundle limit against this app's 245 MB. But it is serverless: a cold start re-imports scikit-learn, so the first request after a quiet period is slow. |
+| ~~Hugging Face Spaces~~ | **No longer** | Docker Spaces now require a PRO plan for personal accounts. Only Static Spaces are free, and those cannot run Python. The `Dockerfile` still works if you have PRO or deploy it elsewhere. |
+| ~~Firebase~~ | **No** | App Hosting supports Next.js and Angular, not Python, and requires the Blaze plan — a credit card — regardless. |
 
 Every one of them needs the Neon database from section A. Sections C and D
 below apply whichever you choose; only the place you type the variables differs.

@@ -286,21 +286,27 @@ Creating a web service by hand gives you no database and an ephemeral disk.
 
 ---
 
-## 2b. Deploy free to Hugging Face Spaces (no credit card, ever)
+## 2b. Deploy to Hugging Face Spaces (now requires a PRO plan)
 
-Use this if Render asks for a card. Hugging Face Spaces is free permanently,
-never asks for payment details, and gives a permanent public HTTPS URL. For a
-machine-learning project it is arguably the more appropriate home anyway, since
-Spaces is where ML demos are normally published.
+> **This route is no longer free.** Hugging Face now requires a PRO plan on a
+> personal account to create a Gradio or Docker Space, because both run on
+> compute. Only Static Spaces remain free, and those serve files - they cannot
+> run Python, so they cannot run this.
+>
+> The instructions below still work if you have PRO. If you do not, use Render
+> with a Neon database, or Vercel; both are free and both are configured in this
+> repository. See [DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md).
 
-The repository is already configured for it: the YAML block at the top of
-`README.md` tells Spaces this is a Docker Space listening on port 8000, and the
-`Dockerfile` runs as UID 1000, which Spaces requires.
+For a machine-learning project Spaces is arguably the most appropriate home,
+since it is where ML demos are normally published, and the repository is fully
+configured for it: the YAML block at the top of `README.md` declares a Docker
+Space on port 8000, and the `Dockerfile` runs as UID 1000, which Spaces
+requires.
 
 ### Step A: Create the Space
 
-1. Sign up at [huggingface.co/join](https://huggingface.co/join) — email and
-   password only, no card.
+1. Sign up at [huggingface.co/join](https://huggingface.co/join), and upgrade
+   the account to **PRO** — Docker Spaces are not available on the free tier.
 2. Go to [huggingface.co/new-space](https://huggingface.co/new-space).
 3. **Space name**: `digisafe`
 4. **License**: MIT
