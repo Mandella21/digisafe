@@ -22,8 +22,20 @@ fallback keeps the container start-up deterministic on free-tier hosting
 where `nltk.download()` may be blocked or slow.
 """
 
-from nltk.stem import PorterStemmer
-from nltk.tokenize import RegexpTokenizer
+# NLTK is NOT imported here.
+#
+# Importing it costs about five seconds - it pulls in nltk.chunk, nltk.parse
+# and their dependencies - and this module is imported transitively by anything
+# that touches the classifier, which means by the application at start-up. On a
+# serverless host that has to finish initialising within roughly ten seconds,
+# five of them spent on an import nothing has asked to use yet is the
+# difference between a deployment that starts and one that reports only
+# FUNCTION_INVOCATION_FAILED.
+#
+# The tokeniser and stemmer are built on first use instead. Nothing else
+# changes: the same NLTK classes, the same behaviour, and preprocess_to_string
+# stays a module-level function so joblib can still pickle a fitted pipeline
+# that references it.
 
 # --- Stop-words -----------------------------------------------------------
 # Try NLTK's corpus; fall back to the bundled copy of the same list if the
@@ -64,10 +76,30 @@ def _load_stopwords():
     return words - _KEEP_ALWAYS
 
 
-STOP_WORDS = _load_stopwords()
+# Built on the first call to preprocess_text(), then reused. Module-level so
+# the cost is paid once per process, not once per classification.
+_tokenizer = None
+_stemmer = None
+STOP_WORDS = None
 
-_tokenizer = RegexpTokenizer(r"[a-z0-9']+")
-_stemmer = PorterStemmer()
+
+def _ensure_ready():
+    """Import NLTK and build the tokeniser, stemmer and stop-word set.
+
+    Idempotent and cheap after the first call. Not thread-locked: building
+    these twice concurrently is harmless - both results are equivalent and the
+    last assignment wins - and a lock here would cost more than it saves.
+    """
+    global _tokenizer, _stemmer, STOP_WORDS
+    if _tokenizer is not None:
+        return
+
+    from nltk.stem import PorterStemmer
+    from nltk.tokenize import RegexpTokenizer
+
+    STOP_WORDS = _load_stopwords()
+    _tokenizer = RegexpTokenizer(r"[a-z0-9']+")
+    _stemmer = PorterStemmer()
 
 
 def preprocess_text(text):
@@ -78,6 +110,7 @@ def preprocess_text(text):
     if not text:
         return []
 
+    _ensure_ready()
     tokens = _tokenizer.tokenize(text.lower())
     return [
         _stemmer.stem(tok)

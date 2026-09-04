@@ -20,6 +20,7 @@ for _threads_var in (
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from core.config import settings, BASE_DIR, DOTENV_PATH, DOTENV_LOADED
@@ -59,6 +60,22 @@ def _report_mail_configuration():
 
 _INITIALISED = False
 
+# Set when start-up fails, and rendered by the handler below instead of letting
+# the whole process die. See initialise_application().
+STARTUP_ERROR = None
+
+
+def _redact(message: str) -> str:
+    """Strip credentials out of anything before it is shown in a browser.
+
+    A failed database connection puts the whole connection string into the
+    exception text, password included. This page is public, so that string can
+    never reach it verbatim.
+    """
+    import re
+
+    return re.sub(r"(?<=://)[^/\s@]+:[^/\s@]+(?=@)", "***:***", message)
+
 
 def initialise_application():
     """Create the schema, apply migrations, and load the models.
@@ -73,12 +90,22 @@ def initialise_application():
     only adds absent columns, and the migration ledger blocks re-runs. The flag
     just avoids paying for those checks on every cold start.
     """
-    global _INITIALISED
+    global _INITIALISED, STARTUP_ERROR
     if _INITIALISED:
         return
 
-    Base.metadata.create_all(bind=engine)
-    ensure_schema()
+    # The database is the only genuinely fatal dependency. Recorded rather than
+    # raised: on a serverless host an exception here kills the invocation and
+    # the visitor sees nothing but FUNCTION_INVOCATION_FAILED, with the real
+    # cause buried in a platform log. Saving it lets the handler below say what
+    # actually went wrong, in the browser, where it will be seen.
+    try:
+        Base.metadata.create_all(bind=engine)
+        ensure_schema()
+    except Exception as exc:
+        STARTUP_ERROR = _redact(f"{type(exc).__name__}: {exc}")
+        print(f"STARTUP FAILED - could not prepare the database: {STARTUP_ERROR}")
+        return
 
     if settings.SEED_DEMO_DATA:
         seed_database()
@@ -88,13 +115,17 @@ def initialise_application():
 
     _report_mail_configuration()
 
-    # Load the trained scikit-learn models once, up front, so the first victim
-    # to submit evidence does not pay the model-loading latency (Section 3.10,
-    # Performance: submissions must respond within three seconds).
-    if ml_service.warmup():
-        print(f"ML classifier ready ({ml_service.MODEL_VERSION}).")
-    else:
-        print("WARNING: ML models failed to load. Run: python ml_model/train_model.py")
+    # Loading the models up front spares the first victim to submit evidence
+    # the loading latency (Section 3.10: submissions respond within three
+    # seconds). Never fatal - classify_text() loads them itself if this is
+    # skipped, so a failure here costs latency, not function.
+    try:
+        if ml_service.warmup():
+            print(f"ML classifier ready ({ml_service.MODEL_VERSION}).")
+        else:
+            print("WARNING: ML models failed to load. Run: python ml_model/train_model.py")
+    except Exception as exc:
+        print(f"WARNING: ML warm-up skipped ({type(exc).__name__}: {exc}).")
 
     _INITIALISED = True
 
@@ -149,6 +180,37 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 # Everything under it is now served through an authenticated endpoint that
 # checks who is asking: attachments via /api/evidence/{id}/attachment, reports
 # via /api/reports/download/{id}.
+
+@app.middleware("http")
+async def report_startup_failure(request, call_next):
+    """Answer every request with the reason start-up failed, if it did.
+
+    Without this the application still imports and still routes, but every
+    database-backed request fails somewhere deeper with an error that describes
+    a symptom - a missing table, a closed connection - rather than the cause.
+    One clear 503 naming the real problem is worth more than a hundred
+    confusing 500s, particularly to somebody who cannot reach the platform's
+    own logs.
+    """
+    if STARTUP_ERROR is not None:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "DigiSafe could not start.",
+                "cause": STARTUP_ERROR,
+                "most_likely": (
+                    "DATABASE_URL is missing, or points at a database this "
+                    "deployment cannot reach. Check it is set in the hosting "
+                    "dashboard and that the database is awake."
+                ),
+                "note": (
+                    "Credentials are removed from the message above. See "
+                    "DEPLOY_CHECKLIST.md section C."
+                ),
+            },
+        )
+    return await call_next(request)
+
 
 # Include Routers
 app.include_router(pages.router, tags=["Web Pages"])
