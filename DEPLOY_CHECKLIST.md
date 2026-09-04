@@ -60,15 +60,20 @@ instance risks an out-of-memory build failure.
 
 ## C. Environment variables
 
-### Set these five now — the site will not work correctly without them
+### Four variables. That is the whole list.
 
 | Key | Value |
 |---|---|
-| `PYTHON_VERSION` | `3.12.7` |
 | `DATABASE_URL` | the Neon connection string from section A |
 | `SECRET_KEY` | see generator below |
 | `DIGISAFE_AES_KEY` | see generator below — **exactly 32 characters** |
 | `DIGISAFE_REQUIRE_VERIFICATION` | `false` *(until email works — see section D)* |
+
+On **Render** add `PYTHON_VERSION` = `3.12` as a fifth. Vercel reads
+`.python-version` from the repository instead and ignores that variable.
+
+Ignore every other name you see in section E or in `.env.example`. Those are
+reference material, and each already has a default that works.
 
 Generate the two secrets on your own machine and copy the output:
 
@@ -129,9 +134,17 @@ first message — if it lands there, mark it "not spam" before showing anyone.
 
 ---
 
-## E. Every setting the platform understands
+## E. Reference — NOT a list to fill in
 
-Only the ones marked **required** matter for a working deployment.
+**You do not set these.** Every one has a working default; the table exists so
+that when you later want to change how long a code lasts, or which mail server
+is used, you know the name to use.
+
+The only variables you set are the four in section C, plus the email group in
+section D when you have a password. A deployment with exactly those four was
+tested end to end: register, sign in, submit evidence, SHA-256 fingerprint,
+Critical threat classification, PDF report, and the browser icon — all working,
+with none of the rest of this table set to anything.
 
 | Variable | Default | What it does |
 |---|---|---|
