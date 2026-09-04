@@ -57,17 +57,37 @@ def _report_mail_configuration():
         print("  Anyone registering from their own device will not be able to see them.")
         print("  To send real email: copy .env.example to .env, then see EMAIL_SETUP.md.")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup: Ensure tables & seed data exist
+_INITIALISED = False
+
+
+def initialise_application():
+    """Create the schema, apply migrations, and load the models.
+
+    Kept out of the lifespan handler and made idempotent because a serverless
+    platform may never run one. Vercel imports the ASGI app and invokes it per
+    request; if the only place the tables were created was a startup event that
+    never fires, every request would fail on a database with no tables - and
+    the error would name a missing table rather than the missing startup.
+
+    Safe to call repeatedly: create_all skips tables that exist, ensure_schema
+    only adds absent columns, and the migration ledger blocks re-runs. The flag
+    just avoids paying for those checks on every cold start.
+    """
+    global _INITIALISED
+    if _INITIALISED:
+        return
+
     Base.metadata.create_all(bind=engine)
     ensure_schema()
+
     if settings.SEED_DEMO_DATA:
         seed_database()
         print("Demonstration data seeded (DIGISAFE_SEED_DEMO is on).")
     else:
         print("Running with a real, empty database. Users are created by signing up.")
+
     _report_mail_configuration()
+
     # Load the trained scikit-learn models once, up front, so the first victim
     # to submit evidence does not pay the model-loading latency (Section 3.10,
     # Performance: submissions must respond within three seconds).
@@ -75,6 +95,15 @@ async def lifespan(app: FastAPI):
         print(f"ML classifier ready ({ml_service.MODEL_VERSION}).")
     else:
         print("WARNING: ML models failed to load. Run: python ml_model/train_model.py")
+
+    _INITIALISED = True
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Everything startup does now lives in initialise_application(), so a host
+    # that never runs a lifespan event still gets a working application.
+    initialise_application()
     yield
 
 app = FastAPI(

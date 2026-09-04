@@ -1,4 +1,5 @@
 import os
+import tempfile
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -154,6 +155,35 @@ class Settings:
     
 settings = Settings()
 settings.OUTBOX_DIR = BASE_DIR / 'storage' / 'outbox'
-settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-settings.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-settings.OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _writable_dir(preferred: Path) -> Path:
+    """Return `preferred` if we can write to it, otherwise a temp directory.
+
+    Serverless platforms ship the application to a READ-ONLY filesystem - on
+    Vercel everything under /var/task - with only the system temp directory
+    writable. Creating these directories at import time therefore raised
+    OSError before a single request was served, and the deployment failed with
+    a stack trace pointing at configuration rather than at the real cause.
+
+    Falling back keeps the platform working there. What lands in the fallback
+    is only ever regenerable: PDF reports are rebuilt from the record on
+    demand, and the outbox holds copies of mail that could not be sent. The
+    things that must survive - accounts, evidence, attachments - live in the
+    database precisely because no disk here can be trusted to persist.
+    """
+    try:
+        preferred.mkdir(parents=True, exist_ok=True)
+        probe = preferred / '.write-probe'
+        probe.write_bytes(b'')
+        probe.unlink()
+        return preferred
+    except OSError:
+        fallback = Path(tempfile.gettempdir()) / 'digisafe' / preferred.name
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+
+
+settings.UPLOAD_DIR = _writable_dir(settings.UPLOAD_DIR)
+settings.REPORTS_DIR = _writable_dir(settings.REPORTS_DIR)
+settings.OUTBOX_DIR = _writable_dir(settings.OUTBOX_DIR)

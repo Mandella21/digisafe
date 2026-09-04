@@ -17,7 +17,22 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Re-exported for Vercel to find. main.py resolves its template and static
-# directories from BASE_DIR rather than the working directory, which is what
-# lets it be imported from here at all.
-from main import app  # noqa: E402,F401
+# main.py resolves its template and static directories from BASE_DIR rather
+# than the working directory, which is what lets it be imported from here.
+from main import app, initialise_application  # noqa: E402
+
+# Run startup here, explicitly.
+#
+# A long-running server gets this from the ASGI lifespan event. Serverless
+# invocations may not run one at all, and without it the schema is never
+# created - so every request would fail against an empty database, reporting a
+# missing table rather than a missing startup. Calling it at import time means
+# it happens once per cold start, which is exactly when it is needed.
+#
+# It is deliberately not wrapped in try/except: if the database is unreachable
+# or misconfigured, failing loudly here surfaces it in the deployment log,
+# where it can be read. Swallowing it would produce a site that loads and then
+# fails on every action, for reasons nothing records.
+initialise_application()
+
+__all__ = ["app"]
