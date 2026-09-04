@@ -6,7 +6,7 @@ from core.config import settings, BASE_DIR
 
 STATIC_IMG = BASE_DIR / "static" / "img"
 
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 # base.html wraps every page, so demo_mode is registered as a Jinja global
 # rather than passed per route. Missing it on one route would silently render

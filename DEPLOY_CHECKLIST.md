@@ -21,6 +21,24 @@ Keep that tab open — you need the string in section C.
 
 ---
 
+## Choosing a host
+
+All three below run this app and need no credit card. Pick one.
+
+| Host | Card | Notes |
+|---|---|---|
+| **Hugging Face Spaces** | never | Already configured — `Dockerfile` + the YAML block in `README.md`. Sleeps after ~48h idle. Best fit for an ML project. |
+| **Vercel** | Hobby needs none | Configured — `vercel.json` + `api/index.py`. Python functions get a 500 MB bundle limit and this app is 245 MB. Serverless, so a cold start reloads scikit-learn; expect the first request after idle to be slow. |
+| **Render** | web service no, its Postgres yes | Configured — `render.yaml`. Use Neon for the database and no card is needed. Sleeps after 15 min idle. |
+
+**Firebase cannot host this.** App Hosting supports Next.js and Angular, not
+Python, and requires the Blaze plan — a credit card — regardless.
+
+Every one of them needs the Neon database from section A. Sections C and D
+below apply whichever you choose; only the place you type the variables differs.
+
+---
+
 ## B. Create the web service (Render — free)
 
 <https://dashboard.render.com> → **New ▾ → Web Service** → connect
@@ -141,6 +159,50 @@ Only the ones marked **required** matter for a working deployment.
 | `VERIFICATION_RESEND_COOLDOWN` | `60` | Seconds between resends for one account. |
 | `VERIFICATION_MAX_ATTEMPTS` | `8` | Wrong guesses before a code is cancelled. |
 | `DIGISAFE_SEED_DEMO` | `false` | `true` seeds sample cases and one-click role logins. **Keep false on anything public** — those buttons hand any visitor an administrator session. |
+
+---
+
+## E2. Deploying to Vercel instead
+
+1. <https://vercel.com/signup> → **Continue with GitHub** (Hobby plan, no card)
+2. **Add New… → Project** → import `Mandella21/digisafe`
+3. Framework Preset: **Other**. Leave build and output settings empty —
+   `vercel.json` already describes everything.
+4. Expand **Environment Variables** and add the same five from section C.
+5. **Deploy**
+
+You get `https://digisafe-<something>.vercel.app`, permanently.
+
+`api/index.py` is the entrypoint: Vercel does not run `uvicorn`, it imports an
+ASGI app from under `api/`. That file just puts the project root on `sys.path`
+and re-exports the same application every other host runs.
+
+**The trade-off:** Vercel is serverless, so an idle function is torn down and
+the next request pays for reloading scikit-learn and the models. On Render or
+Spaces the process stays alive between requests. If the first hit after a quiet
+period feels slow, that is why — and it is the reason a long-running host suits
+this project better.
+
+---
+
+## E3. Deploying to Hugging Face Spaces instead
+
+Full steps are in [DEPLOYMENT.md](DEPLOYMENT.md) section 2b. In short:
+
+1. <https://huggingface.co/join> — email and password, no card
+2. <https://huggingface.co/new-space> → name `digisafe` → SDK **Docker → Blank**
+   → **CPU basic** (free) → Public → Create
+3. Push to it:
+
+   ```bash
+   git remote add hf https://huggingface.co/spaces/YOUR-USERNAME/digisafe
+   git push hf main
+   ```
+
+   Use a **write token** from <https://huggingface.co/settings/tokens> as the
+   password, not your account password.
+4. Space → **Settings → Variables and secrets** → add the same five from
+   section C as **Secrets**.
 
 ---
 

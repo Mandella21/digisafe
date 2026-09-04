@@ -22,7 +22,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from core.config import settings, DOTENV_PATH, DOTENV_LOADED
+from core.config import settings, BASE_DIR, DOTENV_PATH, DOTENV_LOADED
 from core.database import engine, ensure_schema
 from models.base import Base
 from seed_data import seed_database
@@ -100,7 +100,14 @@ app.add_middleware(
 )
 
 # Mount Static & Storage Assets
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Absolute, not "static".
+#
+# A relative directory is resolved against the process's working directory, so
+# the app only worked when launched from the project root. Anything that starts
+# it from elsewhere - a serverless entrypoint under api/, a systemd unit, a
+# scheduled task - gets a server whose pages load with no CSS and no logo, and
+# no error explaining why.
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 # storage/ is deliberately NOT mounted.
 #
 # It previously was, which served every file under it to anyone who could name
